@@ -43,25 +43,19 @@ export const getTokenPrices = async (mints: string[]) => {
         const prices: { [mint: string]: number } = {};
         
         // Helius free tier has a low rate limit for getAsset, so we fetch in batches
-        const batchSize = 10;
+        const batchSize = 100;
         for (let i = 0; i < mints.length; i += batchSize) {
             const batchMints = mints.slice(i, i + batchSize);
-            const pricePromises = batchMints.map(async (mint) => {
-                try {
-                    const asset = await helius.rpc.getAsset(mint);
-                    if (asset?.token_info?.price_info?.price_per_token) {
-                        return { mint, price: asset.token_info.price_info.price_per_token };
-                    }
-                } catch (e) {
-                    console.warn(`Could not fetch price for mint ${mint}`, e);
+            if (batchMints.length > 0) {
+              const priceData = await helius.rpc.getPriorityFeeEstimate({
+                // @ts-ignore
+                account: batchMints
+              });
+              if(priceData.token_data) {
+                for (const token of priceData.token_data) {
+                  prices[token.mint] = token.price
                 }
-                return { mint, price: null };
-            });
-            const results = await Promise.all(pricePromises);
-            for (const result of results) {
-                if (result.price !== null) {
-                    prices[result.mint] = result.price;
-                }
+              }
             }
         }
         
