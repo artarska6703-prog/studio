@@ -180,5 +180,3 @@ export async function GET(
     return NextResponse.json({ error: `Failed to fetch transactions: ${errorMessage}` }, { status: 500 });
   }
 }
-
-    
