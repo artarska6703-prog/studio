@@ -42,13 +42,6 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     
                     const valueUSD = isNative && solPrice ? (Math.abs(finalAmount) * solPrice) : null;
                     
-                    console.log('USD Calculation:', {
-                        isNative,
-                        finalAmount,
-                        valueUSD,
-                        symbol: isNative ? 'SOL' : transfer.mint
-                    });
-
                     flattenedTxs.push({
                         ...tx,
                         blockTime: blockTime,
