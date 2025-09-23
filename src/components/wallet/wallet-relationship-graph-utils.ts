@@ -3,6 +3,7 @@ import { Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Transaction, FlattenedTransaction } from '@/lib/types';
 import { shortenAddress } from '@/lib/solana-utils';
+import { formatCurrency } from '@/lib/utils';
 
 export interface GraphNode extends Node {
     id: string;
@@ -17,6 +18,7 @@ export interface GraphLink extends Edge {
     to: string;
     value: number;
     width?: number;
+    volume: number;
 }
 
 export interface PhysicsState {
@@ -104,11 +106,16 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
             if (!adjacencyList[to].includes(from)) adjacencyList[to].push(from);
 
             const linkId = [from, to].sort().join('-');
+            const value = 'valueUSD' in tx ? tx.valueUSD : tx.events?.nft?.amount;
+
             if (!allLinks[linkId]) {
-                allLinks[linkId] = { from: from, to: to, value: 0, title: '0 interactions' };
+                allLinks[linkId] = { from: from, to: to, value: 0, volume: 0, title: '0 interactions' };
             }
-            allLinks[linkId].value += 1; // Increment interaction count
-            allLinks[linkId].title = `${allLinks[linkId].value} interactions`;
+            allLinks[linkId].value += 1;
+            if (value) {
+                allLinks[linkId].volume += Math.abs(value);
+            }
+            allLinks[linkId].title = `${allLinks[linkId].value} interactions<br>Volume: ${formatCurrency(allLinks[linkId].volume)}`;
             allLinks[linkId].width = Math.log2(allLinks[linkId].value + 1) * 2;
         }
     });
@@ -172,7 +179,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 fixed: fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
-                title: `Address: ${address}<br>Interaction Volume: ${balance.toFixed(2)} USD<br>Transactions: ${txCount}<br>Type: ${nodeType}<br>Hops: ${nodeDepths.get(address) ?? 'N/A'}`,
+                title: `Address: ${address}<br>Interaction Volume: ${formatCurrency(balance)}<br>Transactions: ${txCount}<br>Type: ${nodeType}<br>Hops: ${nodeDepths.get(address) ?? 'N/A'}`,
             };
         });
 
