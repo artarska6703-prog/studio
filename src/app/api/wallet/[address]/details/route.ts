@@ -6,7 +6,7 @@ import { isValidSolanaAddress } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
 import { unstable_cache } from 'next/cache';
 
-const heliusApiKey = process.env.HELIUS_API_KEY;
+const heliusApiKey = "9e385df8-c8d3-4916-9615-3c9320ca87ff";
 const rpcEndpoint = "https://solana-mainnet.api.syndica.io/api-key/4kc7afJfAHBE2BvjRPSNR8RcdcJxSEtc6oMqaDnEDzX8Mx5zYZRFXT67dHLmJNqcccdW817WZaM4edyHNqLp8839nq3W9DRaay6";
 
 const getTokenPrices = unstable_cache(
