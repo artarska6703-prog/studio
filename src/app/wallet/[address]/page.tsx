@@ -38,7 +38,7 @@ type WalletPageProps = {
 };
 
 export default function WalletPage({ params }: WalletPageProps) {
-  const { address } = params;
+  const address = params.address;
 
   if (!isValidSolanaAddress(address)) {
     notFound();
