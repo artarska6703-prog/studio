@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/header";
 import { BalanceCard } from "@/components/wallet/balance-card";
 import { TransactionTable } from "@/components/wallet/transaction-table";
 import { WalletHeader } from "@/components/wallet/wallet-header";
-import type { WalletDetails, FlattenedTransaction } from "@/lib/types";
+import type { WalletDetails, FlattenedTransaction, Transaction } from "@/lib/types";
 import Loading from '@/app/wallet/[address]/loading';
 import { TokenTable } from '@/components/wallet/token-table';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,8 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
   const [addressBalances, setAddressBalances] = useState<{ [key: string]: number }>({});
-  const [expandedWallets, setExpandedWallets] = useState<Set<string>>(new Set());
+  const [expandedWallets, setExpandedWallets] = useState<Set<string>>(new Set([address]));
+  const [isExpanding, setIsExpanding] = useState<boolean>(false);
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,135 +46,128 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
   const [useMockData, setUseMockData] = useState(false);
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const fetchTransactionsForAddress = useCallback(async (wallet: string) => {
+    const url = `/api/wallet/${wallet}/transactions?limit=${TXN_PAGE_SIZE}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(`Failed to fetch transactions for ${wallet}: ${errorData.error || res.statusText}`);
+    }
+    const data = await res.json();
+    if (data.error) {
+        throw new Error(`Failed to fetch transactions for ${wallet}: ${data.error}`);
+    }
+    return data;
+  }, []);
   
-    const fetchMoreTransactions = useCallback(async () => {
-        if (!nextSignature || isFetchingMore || useMockData) {
-            return;
-        }
-
-        setIsFetchingMore(true);
+  // Effect for initial load and for fetching data for newly expanded wallets
+  useEffect(() => {
+    const fetchInitialData = async () => {
+        setIsLoading(true);
+        setError(null);
         try {
-            const url = `/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}&before=${nextSignature}`;
-            const txRes = await fetch(url);
-            
-            if (!txRes.ok) {
-              const errorData = await txRes.json();
-              throw new Error(`API failed: ${errorData.error || txRes.statusText}`);
-            }
-            
-            const txData = await txRes.json();
-             if (txData.error) {
-              throw new Error(txData.error);
-            }
-            
-            setTransactions(prev => [...prev, ...(txData.transactions || [])]);
-            setAddressBalances(prev => ({ ...prev, ...txData.addressBalances }));
-            setNextSignature(txData.nextCursor);
+            const detailsRes = await fetch(`/api/wallet/${address}/details`);
+            if (!detailsRes.ok) throw new Error((await detailsRes.json()).message || 'Failed to fetch wallet details');
+            setWalletDetails(await detailsRes.json());
 
+            const rootTxData = await fetchTransactionsForAddress(address);
+            setTransactions(rootTxData.transactions || []);
+            setAddressBalances(rootTxData.addressBalances || {});
+            setNextSignature(rootTxData.nextCursor);
         } catch (e: any) {
             setError(e.message);
-            setNextSignature(null); // Stop fetching on error
         } finally {
-            setIsFetchingMore(false);
+            setIsLoading(false);
         }
-    }, [address, isFetchingMore, nextSignature, useMockData]);
-    
-    const fetchTransactionsForAddress = useCallback(async (wallet: string) => {
-        const url = `/api/wallet/${wallet}/transactions?limit=${TXN_PAGE_SIZE}`;
-        const res = await fetch(url);
-        if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(`Failed to fetch transactions for ${wallet}: ${errorData.error || res.statusText}`);
-        }
-        const data = await res.json();
-        if (data.error) {
-            throw new Error(`Failed to fetch transactions for ${wallet}: ${data.error}`);
-        }
-        return data; // Return full response { transactions, addressBalances }
-    }, []);
+    };
+
+    if (!useMockData) {
+        fetchInitialData();
+    } else {
+        setIsLoading(false);
+        setError(null);
+        setTransactions([]);
+        setAddressBalances({});
+        setNextSignature(null);
+    }
+    // This effect should only run when the root address changes or when we toggle mock data
+  }, [address, useMockData, fetchTransactionsForAddress]);
 
 
-    const handleExpandNode = useCallback((nodeAddress: string) => {
-        if (useMockData) return; // Don't expand on mock data
+  const handleExpandNode = useCallback(async (nodeAddress: string) => {
+    if (useMockData || expandedWallets.has(nodeAddress) || isExpanding) return;
+
+    setIsExpanding(true);
+    setError(null);
+    try {
+        const newData = await fetchTransactionsForAddress(nodeAddress);
+        
+        // Merge new data without causing a full reload
+        setTransactions(prev => {
+            const existingSignatures = new Set(prev.map(tx => tx.signature));
+            const newUniqueTxs = (newData.transactions || []).filter((tx: Transaction) => !existingSignatures.has(tx.signature));
+            return [...prev, ...newUniqueTxs];
+        });
+
+        setAddressBalances(prev => ({ ...prev, ...(newData.addressBalances || {}) }));
+        
+        // Add the newly fetched address to the expanded set
         setExpandedWallets(prev => new Set(prev).add(nodeAddress));
-    }, [useMockData]);
 
-    useEffect(() => {
-        const fetchInitialAndExpandedData = async () => {
-            setIsLoading(true);
-            setError(null);
-            setTransactions([]);
-            setAddressBalances({});
-            setNextSignature(null);
-            
-            try {
-                // Fetch details for the root address
-                const detailsRes = await fetch(`/api/wallet/${address}/details`);
-                if (!detailsRes.ok) {
-                    const errorData = await detailsRes.json();
-                    throw new Error(errorData.message || 'Failed to fetch wallet details');
-                }
-                const detailsData = await detailsRes.json();
-                setWalletDetails(detailsData);
-                
-                // Fetch transactions for root and all expanded addresses
-                const allAddressesToFetch = [address, ...Array.from(expandedWallets)];
-                const transactionPromises = allAddressesToFetch.map(addr => fetchTransactionsForAddress(addr));
-                
-                const results = await Promise.all(transactionPromises);
-                
-                let combinedTransactions: FlattenedTransaction[] = [];
-                let combinedBalances: { [key: string]: number } = {};
+    } catch (e: any) {
+        setError(`Failed to expand ${nodeAddress}: ${e.message}`);
+    } finally {
+        setIsExpanding(false);
+    }
+  }, [useMockData, expandedWallets, isExpanding, fetchTransactionsForAddress]);
 
-                results.forEach(result => {
-                    if (result.transactions) {
-                        combinedTransactions.push(...result.transactions);
-                    }
-                    if (result.addressBalances) {
-                        combinedBalances = { ...combinedBalances, ...result.addressBalances };
-                    }
-                });
 
-                // Remove duplicate transactions
-                const uniqueTransactions = Array.from(new Map(combinedTransactions.map(tx => [tx.signature, tx])).values());
+  const fetchMoreTransactions = useCallback(async () => {
+    if (!nextSignature || isFetchingMore || useMockData) {
+        return;
+    }
 
-                setTransactions(uniqueTransactions);
-                setAddressBalances(combinedBalances);
-                
-                // For now, pagination is only supported for the root address from its own initial fetch
-                const rootResult = results.find((r, i) => allAddressesToFetch[i] === address);
-                if (rootResult && rootResult.nextCursor) {
-                    setNextSignature(rootResult.nextCursor);
-                }
-
-            } catch (e: any) {
-                setError(e.message);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        if (!useMockData) {
-            fetchInitialAndExpandedData();
-        } else {
-          setIsLoading(false);
-          setError(null);
+    setIsFetchingMore(true);
+    try {
+        const url = `/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}&before=${nextSignature}`;
+        const txRes = await fetch(url);
+        
+        if (!txRes.ok) {
+          const errorData = await txRes.json();
+          throw new Error(`API failed: ${errorData.error || txRes.statusText}`);
         }
-    }, [address, expandedWallets, useMockData, fetchTransactionsForAddress]);
-  
+        
+        const txData = await txRes.json();
+         if (txData.error) {
+          throw new Error(txData.error);
+        }
+        
+        setTransactions(prev => [...prev, ...(txData.transactions || [])]);
+        setAddressBalances(prev => ({ ...prev, ...txData.addressBalances }));
+        setNextSignature(txData.nextCursor);
+
+    } catch (e: any) {
+        setError(e.message);
+        setNextSignature(null); // Stop fetching on error
+    } finally {
+        setIsFetchingMore(false);
+    }
+  }, [address, isFetchingMore, nextSignature, useMockData]);
+
   const handleToggleDataSource = (checked: boolean) => {
     setUseMockData(checked);
-    setExpandedWallets(new Set()); // Reset expanded wallets when toggling
-  }
+    setExpandedWallets(new Set([address])); // Reset expanded wallets when toggling
+  };
 
   const handleScenarioChange = (value: string) => {
     setMockScenario(value as MockScenario);
-  }
-
+  };
+  
   const liveTransactions = useMemo(() => {
-    let allTransactions: (FlattenedTransaction)[] = [];
+    let allTransactions: (FlattenedTransaction | Transaction)[] = [];
     if (useMockData) {
-        const rawMockTxs = (() => {
+        return (() => {
              switch (mockScenario) {
                 case 'whale':
                     return getWhaleTxs(address);
@@ -184,17 +178,6 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                     return getBalancedTxs(address);
             }
         })();
-        // The mock data needs the same processing as the real data.
-        const { nodes } = processTransactions(rawMockTxs, address, 5, {});
-        const balances = new Map(nodes.map(n => [n.id, n.balance]));
-        
-        allTransactions = rawMockTxs.map(tx => ({
-            ...tx,
-            type: tx.amount > 0 ? 'received' : 'sent',
-            by: tx.by,
-            interactedWith: tx.interactedWith,
-            valueUSD: tx.valueUSD ?? (balances.get(tx.to!) || balances.get(tx.from!)) // simplified logic
-        }));
     } else {
       allTransactions = transactions;
     }
@@ -249,10 +232,10 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
       <main className="flex-1 container mx-auto px-4 py-8 space-y-8">
         <WalletHeader address={address} />
         
-         {error && !isLoading && ( // Show non-critical errors without blocking the UI
+         {error && ( // Show non-critical errors without blocking the UI
             <Alert variant="destructive">
                 <Terminal className="h-4 w-4" />
-                <AlertTitle>An error occurred while fetching data</AlertTitle>
+                <AlertTitle>An error occurred</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
             </Alert>
         )}
