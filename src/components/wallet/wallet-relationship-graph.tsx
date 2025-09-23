@@ -261,10 +261,17 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             }
         });
         
-        networkInstance.on('hoverNode', ({ node, event }) => {
-            const nodeData = nodes.find(n => n.id === node);
-            if (nodeData) {
-                setTooltipData({ node: nodeData, position: { x: event.clientX, y: event.clientY } });
+        networkInstance.on('hoverNode', ({ node: nodeId, event }) => {
+            const nodeData = nodes.find(n => n.id === nodeId);
+            if (nodeData && containerRef.current) {
+                const containerRect = containerRef.current.getBoundingClientRect();
+                setTooltipData({ 
+                    node: nodeData, 
+                    position: { 
+                        x: event.clientX - containerRect.left + 15, 
+                        y: event.clientY - containerRect.top + 15 
+                    } 
+                });
             }
         });
 
