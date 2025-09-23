@@ -3,7 +3,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { DataSet, Network, Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,6 +14,7 @@ import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles, PhysicsState } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
+import { WalletDetailSheet } from './wallet-detail-sheet';
 
 const legendItems = [
     { key: 'root', label: 'You' },
@@ -70,13 +70,14 @@ const ALL_NODE_TYPES = legendItems.map(item => item.key);
 
 export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const router = useRouter();
     
     const [maxDepth, setMaxDepth] = useState(3);
     const [minVolume, setMinVolume] = useState(0);
     const debouncedMinVolume = useDebounce(minVolume, 500);
     const [minTransactions, setMinTransactions] = useState(1);
     const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(ALL_NODE_TYPES);
+    const [selectedNode, setSelectedNode] = useState<string | null>(null);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
 
     const [physicsState, setPhysicsState] = useState<PhysicsState>({
         solver: "barnesHut",
@@ -210,9 +211,9 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
                 const clickedNode = nodes.find(n => n.id === nodeId);
-                // Only navigate if it's not the currently viewed wallet (the root node)
                 if (clickedNode && clickedNode.type !== 'root') {
-                    router.push(`/wallet/${nodeId}`);
+                    setSelectedNode(nodeId);
+                    setIsSheetOpen(true);
                 }
             }
         });
@@ -233,9 +234,10 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             networkInstance.destroy();
         };
 
-    }, [nodes, links, physicsState, router]);
+    }, [nodes, links, physicsState]);
 
     return (
+        <>
         <Card className="bg-transparent border-0 shadow-none">
             <CardContent className="grid grid-cols-1 md:grid-cols-12 gap-0 p-0">
                 <div className="md:col-span-3 lg:col-span-3 bg-background p-6 rounded-l-lg overflow-y-auto max-h-[800px]">
@@ -283,5 +285,13 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
                 </div>
             </CardContent>
         </Card>
+        {selectedNode && (
+            <WalletDetailSheet
+                address={selectedNode}
+                open={isSheetOpen}
+                onOpenChange={setIsSheetOpen}
+            />
+        )}
+        </>
     );
 }
