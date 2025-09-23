@@ -30,8 +30,15 @@ const getTokenPrices = async (mints: string[]) => {
 
 
 const getSolanaPrice = async () => {
-    // Temporary hardcoding to fix UI display issues.
-    return 150;
+    if (!HELIUS_API_KEY) return null;
+    try {
+        const helius = new Helius(HELIUS_API_KEY);
+        const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
+        return asset?.token_info?.price_info?.price_per_token ?? null;
+    } catch (error) {
+        console.error("Failed to fetch SOL price:", error);
+        return null;
+    }
 };
 
 const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }): FlattenedTransaction[] => {
