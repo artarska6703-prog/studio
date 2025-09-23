@@ -1,11 +1,11 @@
 
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType, type EnrichedTransaction } from "helius-sdk";
 import { NextResponse } from "next/server";
-import type { FlattenedTransaction, TokenHolding } from "@/lib/types";
+import type { FlattenedTransaction } from "@/lib/types";
 import { unstable_cache } from "next/cache";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 const getTokenPrices = unstable_cache(
     async (mints: string[]) => {
@@ -121,7 +121,7 @@ const processHeliusTransactions = (
         }
     });
 
-    return flattenedTxs;
+    return flattenedTxs.sort((a,b) => (b.blockTime || 0) - (a.blockTime || 0));
 }
 
 
@@ -143,7 +143,8 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
 
-    const transactions = await helius.rpc.getTransactions({
+    // Correctly fetch enriched transactions for an address
+    const transactions = await helius.getTransactions({
       address: params.address,
       options: { limit: 50, before },
     });
@@ -176,7 +177,7 @@ export async function GET(
     if (errorMessage.includes('429')) {
       return NextResponse.json({ error: 'Rate limited by API. Please try again in a moment.' }, { status: 429 });
     }
-    return NextResponse.json({ error: errorMessage, stack: String(err) }, { status: 500 });
+    return NextResponse.json({ error: `Failed to fetch transactions: ${errorMessage}` }, { status: 500 });
   }
 }
 
