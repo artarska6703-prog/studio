@@ -8,18 +8,6 @@ import { Helius } from "helius-sdk";
 const heliusApiKey = process.env.HELIUS_API_KEY;
 const rpcEndpoint = process.env.SYNDICA_RPC_URL;
 
-const getSolanaPrice = async () => {
-    if (!heliusApiKey) return null;
-    try {
-        const helius = new Helius(heliusApiKey);
-        const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
-        return asset?.token_info?.price_info?.price_per_token ?? null;
-    } catch (error) {
-        console.error("Failed to fetch Solana price from Helius:", error);
-        return null;
-    }
-};
-
 const getTokenPrices = async (mints: string[]) => {
     if (mints.length === 0 || !heliusApiKey) return {};
     const helius = new Helius(heliusApiKey);
@@ -77,13 +65,10 @@ export async function GET(
             });
         }
         
-        const [solPrice, tokenPrices] = await Promise.all([
-            getSolanaPrice(),
-            getTokenPrices(tokenMints)
-        ]);
+        const tokenPrices = await getTokenPrices(tokenMints);
         
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
-        const balanceUSD = solPrice ? balance * solPrice : null;
+        const balanceUSD = balance * 150; // Hardcoded price
 
         if (assets && assets.items) {
              tokens = assets.items
