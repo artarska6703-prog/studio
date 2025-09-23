@@ -131,7 +131,7 @@ export async function GET(
                 .filter(token => token.amount > 0);
         }
 
-        const walletDetails: WalletDetails = { address, sol: { balance, price: solPrice, valueUSD}, tokens };
+        const walletDetails: WalletDetails = { address, sol: { balance: balance, price: solPrice, valueUSD: balanceUSD }, tokens };
         
         return NextResponse.json(walletDetails);
 
