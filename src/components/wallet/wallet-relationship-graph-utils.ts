@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils';
 export interface GraphNode extends Node {
     id: string;
     balance: number;
+    balanceUSD: number;
     transactionCount: number;
     type: string;
     notes: string;
@@ -32,7 +33,7 @@ export interface PhysicsState {
   avoidOverlap: number;
 }
 
-const getNodeType = (address: string, balance: number): string => {
+const getNodeType = (address: string, balanceUSD: number): string => {
     const lowerAddress = address.toLowerCase();
     const keywords = {
         exchange: ['binance', 'coinbase', 'kraken', 'ftx', 'kucoin'],
@@ -46,18 +47,16 @@ const getNodeType = (address: string, balance: number): string => {
         }
     }
 
-    const solBalanceInUsd = balance * 150; // Approximate price
-
-    if (solBalanceInUsd > 100000) return 'whale';
-    if (solBalanceInUsd > 50000) return 'shark';
-    if (solBalanceInUsd > 10000) return 'dolphin';
-    if (solBalanceInUsd > 1000) return 'fish';
+    if (balanceUSD > 100000) return 'whale';
+    if (balanceUSD > 50000) return 'shark';
+    if (balanceUSD > 10000) return 'dolphin';
+    if (balanceUSD > 1000) return 'fish';
     return 'shrimp';
 };
 
-const getMass = (balance: number) => {
-    const baseMass = Math.log1p(balance) || 1;
-    const type = getNodeType('', balance); // Balance is now SOL amount, not USD
+const getMass = (balanceUSD: number) => {
+    const baseMass = Math.log1p(balanceUSD) || 1;
+    const type = getNodeType('', balanceUSD);
     if (type === 'exchange' || type === 'platform') return baseMass * 50;
     if (type === 'whale') return baseMass * 10;
     if (type === 'shark') return baseMass * 5;
@@ -65,9 +64,9 @@ const getMass = (balance: number) => {
     return baseMass;
 }
 
-const getNodeSize = (balance: number) => {
-    const baseSize = 5 + Math.log1p(balance);
-    const type = getNodeType('', balance); // Balance is now SOL amount, not USD
+const getNodeSize = (balanceUSD: number) => {
+    const baseSize = 5 + Math.log1p(balanceUSD);
+    const type = getNodeType('', balanceUSD);
     if (type === 'exchange' || type === 'platform') return baseSize * 3.5;
     if (type === 'whale') return baseSize * 2.5;
     if (type === 'shark') return baseSize * 1.5;
@@ -75,7 +74,7 @@ const getNodeSize = (balance: number) => {
     return baseSize;
 }
 
-export const processTransactions = (transactions: (Transaction | FlattenedTransaction)[], rootAddress: string, maxDepth: number, addressBalances: { [key: string]: number }): { nodes: GraphNode[], links: GraphLink[] } => {
+export const processTransactions = (transactions: (Transaction | FlattenedTransaction)[], rootAddress: string, maxDepth: number, addressBalances: { [key: string]: number }, solPrice: number | null): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
     }
@@ -156,9 +155,10 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
     const nodes: GraphNode[] = Object.keys(addressData)
         .filter(address => filteredNodeIds.has(address))
         .map(address => {
-            const { txCount, interactionVolume } = addressData[address];
+            const { txCount } = addressData[address];
             const balance = addressBalances[address] || 0;
-            let nodeType = getNodeType(address, balance);
+            const balanceUSD = solPrice ? balance * solPrice : 0;
+            let nodeType = getNodeType(address, balanceUSD);
             let group = nodeType;
             let label = shortenAddress(address, 4);
             let fixed = false;
@@ -174,12 +174,13 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 id: address,
                 label: label,
                 balance: balance,
+                balanceUSD: balanceUSD,
                 transactionCount: txCount,
                 type: nodeType,
                 notes: '',
                 shape: 'dot',
-                value: getNodeSize(balance),
-                mass: getMass(balance),
+                value: getNodeSize(balanceUSD),
+                mass: getMass(balanceUSD),
                 group: group,
                 fixed,
                 x: fixed ? 0 : undefined,

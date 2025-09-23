@@ -226,6 +226,8 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     ? { address: address, balance: 1234.56, balanceUSD: 1234.56 * 150, tokens: [] } // Fake details for mock
     : walletDetails;
 
+  const solPrice = displayedDetails?.balanceUSD && displayedDetails?.balance ? displayedDetails.balanceUSD / displayedDetails.balance : null;
+
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
       <Header />
@@ -317,6 +319,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                     walletAddress={address}
                     transactions={liveTransactions}
                     addressBalances={addressBalances}
+                    solPrice={solPrice}
                     onNodeClick={handleExpandNode}
                 />
             </TabsContent>

@@ -77,7 +77,7 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
                 <div className="text-right font-mono">{node.balance.toFixed(2)} SOL</div>
                 
                 <div className="text-muted-foreground">Value (USD):</div>
-                <div className="text-right font-mono">{formatCurrency(node.balance * 150)}</div>
+                <div className="text-right font-mono">{formatCurrency(node.balanceUSD)}</div>
                 
                 <div className="text-muted-foreground">Transactions:</div>
                 <div className="text-right font-mono">{node.transactionCount}</div>
@@ -96,13 +96,14 @@ interface WalletNetworkGraphProps {
     walletAddress: string;
     transactions: Transaction[];
     addressBalances: { [key: string]: number };
+    solPrice: number | null;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
     onNodeClick?: (address: string) => void;
 }
 
 const ALL_NODE_TYPES = legendItems.map(item => item.key);
 
-export function WalletNetworkGraph({ walletAddress, transactions = [], addressBalances, onDiagnosticDataUpdate, onNodeClick }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions = [], addressBalances, solPrice, onDiagnosticDataUpdate, onNodeClick }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     
@@ -139,10 +140,10 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             return { nodes: [], links: [] };
         }
         
-        const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances);
+        const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances, solPrice);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
-            node.balance * 150 >= debouncedMinVolume && // Filter by USD value
+            node.balanceUSD >= debouncedMinVolume &&
             node.transactionCount >= minTransactions &&
             (visibleNodeTypes.includes(node.type) || node.type === 'root')
         );
@@ -151,7 +152,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
         const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
-    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, addressBalances]);
+    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, addressBalances, solPrice]);
     
     useEffect(() => {
         onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });
@@ -275,7 +276,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             }
         });
 
-        networkInstance.on('blurNode', () => {
+        networkInstance.on('blurNode', (), => {
             setTooltipData({ node: null, position: null });
         });
 
