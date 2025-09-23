@@ -36,6 +36,7 @@ type WalletPageViewProps = {
 export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
+  const [expandedWallets, setExpandedWallets] = useState<Set<string>>(new Set());
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,57 +75,79 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             setIsFetchingMore(false);
         }
     }, [address, isFetchingMore, nextSignature, useMockData]);
-
-    const fetchInitialData = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        setTransactions([]);
-        setNextSignature(null);
-        try {
-            const [detailsRes, txRes] = await Promise.all([
-                fetch(`/api/wallet/${address}/details`),
-                fetch(`/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}`)
-            ]);
-
-            if (!detailsRes.ok) {
-                 const errorData = await detailsRes.json();
-                 throw new Error(errorData.message || 'Failed to fetch wallet details');
-            }
-            const detailsData = await detailsRes.json();
-            setWalletDetails(detailsData);
-            
-            if (!txRes.ok) {
-                const errorData = await txRes.json();
-                throw new Error(`Failed to fetch transactions: ${errorData.error || txRes.statusText}`);
-            }
-            
-            const txData = await txRes.json();
-
-            if (txData.error) {
-              throw new Error(`Failed to fetch transactions: ${txData.error}`);
-            }
-            
-            setTransactions(txData.transactions || []);
-            setNextSignature(txData.nextCursor);
-        } catch (e: any) {
-            setError(e.message);
-        } finally {
-            setIsLoading(false);
+    
+    const fetchTransactionsForAddress = useCallback(async (wallet: string) => {
+        const url = `/api/wallet/${wallet}/transactions?limit=${TXN_PAGE_SIZE}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(`Failed to fetch transactions for ${wallet}: ${errorData.error || res.statusText}`);
         }
-    }, [address]);
+        const data = await res.json();
+        if (data.error) {
+            throw new Error(`Failed to fetch transactions for ${wallet}: ${data.error}`);
+        }
+        return data.transactions || [];
+    }, []);
 
-    // Initial data fetch
+
+    const handleExpandNode = useCallback((nodeAddress: string) => {
+        if (useMockData) return; // Don't expand on mock data
+        setExpandedWallets(prev => new Set(prev).add(nodeAddress));
+    }, [useMockData]);
+
     useEffect(() => {
+        const fetchInitialAndExpandedData = async () => {
+            setIsLoading(true);
+            setError(null);
+            setTransactions([]);
+            setNextSignature(null);
+            
+            try {
+                // Fetch details for the root address
+                const detailsRes = await fetch(`/api/wallet/${address}/details`);
+                if (!detailsRes.ok) {
+                    const errorData = await detailsRes.json();
+                    throw new Error(errorData.message || 'Failed to fetch wallet details');
+                }
+                const detailsData = await detailsRes.json();
+                setWalletDetails(detailsData);
+                
+                // Fetch transactions for root and all expanded addresses
+                const allAddressesToFetch = [address, ...Array.from(expandedWallets)];
+                const transactionPromises = allAddressesToFetch.map(addr => fetchTransactionsForAddress(addr));
+                
+                const transactionResults = await Promise.all(transactionPromises);
+                
+                // Flatten results and remove duplicates
+                const combinedTransactions = transactionResults.flat();
+                const uniqueTransactions = Array.from(new Map(combinedTransactions.map(tx => [tx.signature, tx])).values());
+
+                setTransactions(uniqueTransactions);
+                
+                // For now, pagination is only supported for the root address
+                if (transactionResults[0]?.nextCursor) {
+                    setNextSignature(transactionResults[0].nextCursor);
+                }
+
+            } catch (e: any) {
+                setError(e.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         if (!useMockData) {
-            fetchInitialData();
+            fetchInitialAndExpandedData();
         } else {
           setIsLoading(false);
           setError(null);
         }
-    }, [fetchInitialData, useMockData]);
+    }, [address, expandedWallets, useMockData, fetchTransactionsForAddress]);
   
   const handleToggleDataSource = (checked: boolean) => {
     setUseMockData(checked);
+    setExpandedWallets(new Set()); // Reset expanded wallets when toggling
   }
 
   const handleScenarioChange = (value: string) => {
@@ -190,7 +213,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     {error}
                   </AlertDescription>
                 </Alert>
-                <Button onClick={fetchInitialData} className="mt-6">Try again</Button>
+                <Button onClick={() => window.location.reload()} className="mt-6">Try again</Button>
             </main>
         </div>
     )
@@ -291,9 +314,10 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                   </div>
                 </div>
                 <WalletNetworkGraph 
-                    key={useMockData ? `mock-${mockScenario}-${address}` : `real-${address}`}
+                    key={useMockData ? `mock-${mockScenario}-${address}` : `real-${address}-${Array.from(expandedWallets).join('-')}`}
                     walletAddress={address}
                     transactions={liveTransactions}
+                    onNodeClick={handleExpandNode}
                 />
             </TabsContent>
         </Tabs>
@@ -302,3 +326,5 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     </div>
   );
 }
+
+    
