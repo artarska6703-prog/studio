@@ -143,7 +143,6 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
 
-    // Corrected method call
     const transactions = await helius.rpc.getTransactions({
       address: params.address,
       options: { limit: 50, before },
