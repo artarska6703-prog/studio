@@ -122,6 +122,10 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
   const [directionFilter, setDirectionFilter] = useState('all');
   const [minValueFilter, setMinValueFilter] = useState('');
   const debouncedMinValue = useDebounce(minValueFilter, 500);
+  const [fromFilter, setFromFilter] = useState('');
+  const debouncedFromFilter = useDebounce(fromFilter, 500);
+  const [toFilter, setToFilter] = useState('');
+  const debouncedToFilter = useDebounce(toFilter, 500);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   
   const tokenMap = useMemo(() => {
@@ -147,11 +151,11 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
     return transactions.filter(tx => {
           if (!tx) return false;
           
-          if (validMinValue > 0 && (tx.valueUSD === null || tx.valueUSD < validMinValue)) return false;
+          if (validMinValue > 0 && (tx.valueUSD === null || Math.abs(tx.valueUSD) < validMinValue)) return false;
           
           const tokenMatch = tokenFilter === 'all' || 
                              (tokenFilter === 'sol' && tx.mint === 'So11111111111111111111111111111111111111112') ||
-                             (tokenFilter === 'spl' && tx.mint !== 'So11111111111111111111111111111111111111112');
+                             (tokenFilter === 'spl' && tx.mint !== 'So1111111111111111111111111111111111111111112');
                              
           const directionMatch = directionFilter === 'all' ||
                                  (directionFilter === 'in' && tx.amount > 0) ||
@@ -165,9 +169,12 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
                                 end: dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from)
                             }) : true);
 
-          return tokenMatch && directionMatch && dateMatch;
+          const fromMatch = !debouncedFromFilter || (tx.from && tx.from.toLowerCase().includes(debouncedFromFilter.toLowerCase()));
+          const toMatch = !debouncedToFilter || (tx.to && tx.to.toLowerCase().includes(debouncedToFilter.toLowerCase()));
+
+          return tokenMatch && directionMatch && dateMatch && fromMatch && toMatch;
       });
-  }, [transactions, tokenFilter, directionFilter, debouncedMinValue, dateRange]);
+  }, [transactions, tokenFilter, directionFilter, debouncedMinValue, dateRange, debouncedFromFilter, debouncedToFilter]);
   
   const totalPages = useMemo(() => {
       const total = Math.ceil(filteredTransactions.length / rowsPerPage);
@@ -187,7 +194,7 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
 
   useEffect(() => {
     setPage(1);
-  }, [rowsPerPage, tokenFilter, directionFilter, debouncedMinValue, dateRange]);
+  }, [rowsPerPage, tokenFilter, directionFilter, debouncedMinValue, dateRange, debouncedFromFilter, debouncedToFilter]);
 
   const handleRowsPerPageChange = (value: string) => {
     setRowsPerPage(parseInt(value, 10));
@@ -230,36 +237,50 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
                 </Button>
             </div>
         </div>
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-wrap items-center gap-2 lg:col-span-2">
                  <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
                     <Button variant={tokenFilter === 'all' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setTokenFilter('all')}>All</Button>
                     <Button variant={tokenFilter === 'sol' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setTokenFilter('sol')}>SOL</Button>
                     <Button variant={tokenFilter === 'spl' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setTokenFilter('spl')}>SPL</Button>
                 </div>
-                <Separator orientation="vertical" className="h-6 mx-2"/>
+                <Separator orientation="vertical" className="h-6 mx-2 hidden md:block"/>
                 <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
                     <Button variant={directionFilter === 'all' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setDirectionFilter('all')}>All</Button>
                     <Button variant={directionFilter === 'out' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setDirectionFilter('out')}>Sent</Button>
                      <Button variant={directionFilter === 'in' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setDirectionFilter('in')}>Received</Button>
                      <Button variant={directionFilter === 'program' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setDirectionFilter('program')}>Interaction</Button>
                 </div>
-                 <Separator orientation="vertical" className="h-6 mx-2"/>
+                 <Separator orientation="vertical" className="h-6 mx-2 hidden md:block"/>
                  <div className="relative">
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                     <Input 
                         placeholder="Min value"
-                        className="h-8 pl-6 w-32"
+                        className="h-8 pl-6 w-28"
                         type="number"
                         value={minValueFilter}
                         onChange={(e) => setMinValueFilter(e.target.value)}
                     />
                  </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-start lg:justify-end gap-2">
                 <DatePickerWithRange date={dateRange} setDate={setDateRange} />
                 {dateRange && <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)}>Clear</Button>}
             </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <Input 
+                placeholder="Filter From address..."
+                className="h-8"
+                value={fromFilter}
+                onChange={(e) => setFromFilter(e.target.value)}
+             />
+             <Input 
+                placeholder="Filter To address..."
+                className="h-8"
+                value={toFilter}
+                onChange={(e) => setToFilter(e.target.value)}
+             />
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -394,6 +415,8 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
     </Card>
   );
 }
+
+    
 
     
 
