@@ -3,24 +3,24 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
-import { getTokenPrices } from "@/lib/price-utils";
+import { getTokenPrices, getSymbolFromMint } from "@/lib/price-utils";
 
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }): FlattenedTransaction[] => {
+const processHeliusTransactions = async (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }): Promise<FlattenedTransaction[]> => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
     
-    transactions.forEach(tx => {
+    for (const tx of transactions) {
         let hasRelevantTransfer = false;
         const blockTime = tx.timestamp || tx.blockTime;
         
-        const processTransfers = (transfers: any[] | undefined | null, isNative: boolean) => {
+        const processTransfers = async (transfers: any[] | undefined | null, isNative: boolean) => {
             if (!transfers) return;
-            transfers.forEach(transfer => {
+            for (const transfer of transfers) {
                 const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress || transfer.owner === walletAddress;
                 
                 if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
@@ -32,14 +32,14 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     
                     const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
                     const price = prices[mint];
-                    const valueUSD = price && amountRaw > 0 ? (amountRaw * price) : null;
+                    const valueUSD = typeof price === "number" ? Math.abs(finalAmount) * price : null;
                     
                     flattenedTxs.push({
                         ...tx,
                         blockTime: blockTime,
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
-                        symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
+                        symbol: isNative ? 'SOL' : await getSymbolFromMint(transfer.mint),
                         mint: mint,
                         from: transfer.fromUserAccount,
                         to: transfer.toUserAccount,
@@ -49,11 +49,11 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                         valueUSD: valueUSD,
                     });
                 }
-            });
+            }
         };
         
-        processTransfers(tx.nativeTransfers, true);
-        processTransfers(tx.tokenTransfers, false);
+        await processTransfers(tx.nativeTransfers, true);
+        await processTransfers(tx.tokenTransfers, false);
 
         if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
             flattenedTxs.push({
@@ -71,7 +71,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                 valueUSD: null,
             });
         }
-    });
+    }
 
     return flattenedTxs;
 }
@@ -131,7 +131,7 @@ export async function GET(
     
     const prices = await getTokenPrices(Array.from(tokenMints));
     
-    const processedTxs = processHeliusTransactions(txArray, params.address, prices);
+    const processedTxs = await processHeliusTransactions(txArray, params.address, prices);
     
     const allAddresses = new Set<string>();
     processedTxs.forEach(tx => {

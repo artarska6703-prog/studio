@@ -1,8 +1,6 @@
 
 import { Helius } from "helius-sdk";
 
-const heliusApiKey = process.env.HELIUS_API_KEY;
-
 interface JupiterToken {
     address: string; // Mint address
     symbol: string;
@@ -100,3 +98,14 @@ export const getSolanaPrice = async (): Promise<number | null> => {
         return null;
     }
 };
+
+/**
+ * Resolves a token mint address to its symbol using the cached Jupiter token list.
+ * @param mint The token mint address.
+ * @returns A promise that resolves to the token symbol string, or null if not found.
+ */
+export const getSymbolFromMint = async (mint: string): Promise<string | null> => {
+    if (!mint) return null;
+    const map = await getJupiterTokenMap();
+    return map.get(mint)?.symbol || null;
+}
