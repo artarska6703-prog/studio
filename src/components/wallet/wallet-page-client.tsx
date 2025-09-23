@@ -213,7 +213,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                         </>
                     ) : <p>No details to display.</p>}
                 </div>
-                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.sol.valueUSD || 0} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
+                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.sol.valueUSD} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
                  <TransactionTable 

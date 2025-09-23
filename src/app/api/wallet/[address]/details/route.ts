@@ -11,7 +11,7 @@ const rpcEndpoint = "https://solana-mainnet.api.syndica.io/api-key/4kc7afJfAHBE2
 
 const getTokenPrices = unstable_cache(
     async (mints: string[]) => {
-        if (mints.length === 0 || !heliusApiKey) return {};
+        if (mints.length === 0) return {};
         try {
             const helius = new Helius(heliusApiKey);
             const prices: { [mint: string]: number } = {};
@@ -49,7 +49,6 @@ const getTokenPrices = unstable_cache(
 
 const getSolanaPrice = unstable_cache(
     async () => {
-        if (!heliusApiKey) return null;
         try {
             const helius = new Helius(heliusApiKey);
             const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
@@ -72,13 +71,6 @@ export async function GET(
 
     if (!isValidSolanaAddress(address)) {
         return NextResponse.json({ message: 'Invalid Solana address format.' }, { status: 400 });
-    }
-
-    if (!heliusApiKey) {
-        return NextResponse.json({ message: 'Helius API key is not configured.' }, { status: 500 });
-    }
-     if (!rpcEndpoint) {
-        return NextResponse.json({ message: 'RPC endpoint is not configured.' }, { status: 500 });
     }
 
     try {

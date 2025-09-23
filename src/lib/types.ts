@@ -34,7 +34,7 @@ export interface ParsedTransfer {
 
 export interface Transaction {
   signature: string;
-  timestamp: number;
+  timestamp?: number;
   blockTime?: number;
   blockNumber?: number;
   fee?: number;
@@ -45,6 +45,16 @@ export interface Transaction {
   nativeTransfers?: ParsedTransfer[];
   tokenTransfers?: ParsedTransfer[];
   events?: any;
+  // Properties added for mock data that need to be in the base type
+  amount: number;
+  valueUSD: number | null;
+  symbol: string | null;
+  mint: string | null;
+  from: string | null;
+  to: string | null;
+  by: string;
+  instruction: string;
+  interactedWith: string[];
 }
 
 export interface FlattenedTransaction extends Transaction {
