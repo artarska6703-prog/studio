@@ -10,71 +10,103 @@ const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }, tokenList: Map<string, string>): FlattenedTransaction[] => {
-    const flattenedTxs: FlattenedTransaction[] = [];
-    if (!transactions || transactions.length === 0) return flattenedTxs;
-    
-    for (const tx of transactions) {
-        let hasRelevantTransfer = false;
-        const blockTime = tx.timestamp || tx.blockTime;
-        
-        const processTransfers = (transfers: any[] | undefined | null, isNative: boolean) => {
-            if (!transfers) return;
-            for (const transfer of transfers) {
-                const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress || transfer.owner === walletAddress;
-                
-                if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
-                    hasRelevantTransfer = true;
-                    
-                    const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.tokenAmount;
-                    const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
-                    const finalAmount = sign * amountRaw;
-                    
-                    const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
-                    const price = prices[mint];
-                    const valueUSD = typeof price === "number" ? Math.abs(amountRaw) * price : null;
-                    
-                    flattenedTxs.push({
-                        ...tx,
-                        blockTime: blockTime,
-                        type: finalAmount > 0 ? 'received' : 'sent',
-                        amount: finalAmount,
-                        symbol: isNative ? 'SOL' : (tokenList.get(mint) || mint.slice(0, 4)),
-                        mint: mint,
-                        from: transfer.fromUserAccount,
-                        to: transfer.toUserAccount,
-                        by: tx.feePayer,
-                        instruction: tx.type,
-                        interactedWith: Array.from(new Set([tx.feePayer, transfer.fromUserAccount, transfer.toUserAccount].filter(a => a && a !== walletAddress))),
-                        valueUSD: valueUSD,
-                    });
-                }
-            }
-        };
-        
-        processTransfers(tx.nativeTransfers, true);
-        processTransfers(tx.tokenTransfers, false);
+const processHeliusTransactions = (
+  transactions: Transaction[],
+  walletAddress: string,
+  prices: { [mint: string]: number },
+  tokenList: Map<string, string>
+): FlattenedTransaction[] => {
+  const flattenedTxs: FlattenedTransaction[] = [];
+  if (!transactions || transactions.length === 0) return flattenedTxs;
 
-        if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
-            flattenedTxs.push({
-                ...tx,
-                blockTime: blockTime,
-                type: 'program_interaction',
-                amount: 0,
-                symbol: null,
-                mint: null,
-                from: tx.feePayer,
-                to: tx.instructions?.[0]?.programId || null,
-                by: tx.feePayer,
-                instruction: tx.type,
-                interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
-                valueUSD: null,
-            });
+  for (const tx of transactions) {
+    let hasRelevantTransfer = false;
+    const blockTime = tx.timestamp || tx.blockTime;
+
+    const processTransfers = (
+      transfers: any[] | undefined | null,
+      isNative: boolean
+    ) => {
+      if (!transfers) return;
+
+      for (const transfer of transfers) {
+        const isOwnerInvolved =
+          transfer.fromUserAccount === walletAddress ||
+          transfer.toUserAccount === walletAddress ||
+          transfer.owner === walletAddress;
+
+        if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
+          hasRelevantTransfer = true;
+
+          const amountRaw = isNative
+            ? transfer.amount / LAMPORTS_PER_SOL
+            : transfer.tokenAmount;
+
+          const sign =
+            transfer.fromUserAccount === walletAddress ||
+            (transfer.owner === walletAddress &&
+              transfer.fromUserAccount !== walletAddress)
+              ? -1
+              : 1;
+
+          const finalAmount = sign * amountRaw;
+
+          const mint = isNative
+            ? "So11111111111111111111111111111111111111112"
+            : transfer.mint;
+
+          const price = prices[mint] ?? 0;
+          const valueUSD = Math.abs(amountRaw) * price;
+
+          flattenedTxs.push({
+            ...tx,
+            blockTime,
+            type: finalAmount > 0 ? "received" : "sent",
+            amount: finalAmount,
+            symbol: isNative ? "SOL" : tokenList.get(mint) || mint.slice(0, 4),
+            mint,
+            from: transfer.fromUserAccount,
+            to: transfer.toUserAccount,
+            by: tx.feePayer,
+            instruction: tx.type,
+            interactedWith: Array.from(
+              new Set(
+                [tx.feePayer, transfer.fromUserAccount, transfer.toUserAccount].filter(
+                  (a) => a && a !== walletAddress
+                )
+              )
+            ),
+            valueUSD,
+          });
         }
-    }
+      }
+    };
 
-    return flattenedTxs;
-}
+    processTransfers(tx.nativeTransfers, true);
+    processTransfers(tx.tokenTransfers, false);
+
+    if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
+      flattenedTxs.push({
+        ...tx,
+        blockTime,
+        type: "program_interaction",
+        amount: 0,
+        symbol: null,
+        mint: null,
+        from: tx.feePayer,
+        to: tx.instructions?.[0]?.programId || null,
+        by: tx.feePayer,
+        instruction: tx.type,
+        interactedWith: Array.from(
+          new Set(tx.instructions?.map((i) => i.programId).filter(Boolean) as string[])
+        ),
+        valueUSD: 0,
+      });
+    }
+  }
+
+  return flattenedTxs;
+};
 
 
 export async function GET(
@@ -178,5 +210,3 @@ export async function GET(
     );
   }
 }
-
-    
