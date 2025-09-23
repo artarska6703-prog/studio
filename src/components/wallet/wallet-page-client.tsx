@@ -198,7 +198,6 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                           <BalanceCard
                               balance={displayedDetails.sol.balance}
                               balanceUSD={displayedDetails.sol.valueUSD}
-                              className="lg:col-span-1"
                           />
                           <TokenTable tokens={displayedDetails.tokens} className="md:col-span-2" />
                         </>
