@@ -15,7 +15,7 @@ export const getTokenPrices = async (mints: string[]): Promise<{ [mint: string]:
     const mintsToFetch = new Set(mints);
 
     // 1. Try Helius first
-    if (heliusApiKey) {
+    if (heliusApiKey && mintsToFetch.size > 0) {
         const helius = new Helius(heliusApiKey);
         try {
             const assets = await helius.rpc.getAssetBatch({ ids: Array.from(mintsToFetch) });
