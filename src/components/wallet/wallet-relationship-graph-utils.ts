@@ -114,13 +114,12 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
             const value = 'valueUSD' in tx ? tx.valueUSD : tx.events?.nft?.amount;
 
             if (!allLinks[linkId]) {
-                allLinks[linkId] = { from: from, to: to, value: 0, volume: 0, title: '0 interactions' };
+                allLinks[linkId] = { from: from, to: to, value: 0, volume: 0 };
             }
             allLinks[linkId].value += 1;
             if (value) {
                 allLinks[linkId].volume += Math.abs(value);
             }
-            allLinks[linkId].title = `${allLinks[linkId].value} interactions<br>Volume: ${formatCurrency(allLinks[linkId].volume)}`;
             allLinks[linkId].width = Math.log2(allLinks[linkId].value + 1) * 2;
         }
     });
@@ -185,6 +184,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
+                title: undefined // Remove title to prevent default tooltip
             };
         });
 

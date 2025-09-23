@@ -15,6 +15,9 @@ import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
 import { WalletDetailSheet } from './wallet-detail-sheet';
 import { useRouter } from 'next/navigation';
+import { shortenAddress } from '@/lib/solana-utils';
+import { formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const legendItems = [
     { key: 'root', label: 'You' },
@@ -55,6 +58,35 @@ const GraphLegend = () => {
     )
 }
 
+const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: { x: number, y: number } | null }) => {
+    if (!node || !position) return null;
+    
+    return (
+        <div
+            className={cn(
+                "absolute p-3 rounded-lg shadow-lg text-xs w-64 z-10 pointer-events-none",
+                "bg-popover text-popover-foreground border"
+            )}
+            style={{ left: `${position.x}px`, top: `${position.y}px` }}
+        >
+            <div className="font-bold border-b border-border pb-1 mb-2 capitalize">
+                {node.type}: {shortenAddress(node.id, 6)}
+            </div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                <div className="text-muted-foreground">Balance:</div>
+                <div className="text-right font-mono">{node.balance.toFixed(2)} SOL</div>
+                
+                <div className="text-muted-foreground">Value (USD):</div>
+                <div className="text-right font-mono">{formatCurrency(node.balance * 150)}</div>
+                
+                <div className="text-muted-foreground">Transactions:</div>
+                <div className="text-right font-mono">{node.transactionCount}</div>
+            </div>
+        </div>
+    );
+};
+
+
 export interface DiagnosticData {
     nodes: GraphNode[];
     links: GraphLink[];
@@ -92,6 +124,8 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
     
     const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    
+    const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null, position: { x: number, y: number } | null }>({ node: null, position: null });
 
 
     const handleNodeTypeToggle = (nodeType: string, checked: boolean) => {
@@ -126,7 +160,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
     useEffect(() => {
         if (!containerRef.current) return;
         
-        const nodesDataSet = new DataSet(nodes);
+        const nodesDataSet = new DataSet(nodes as Node[]);
         const edgesDataSet = new DataSet(links);
 
         const data = { nodes: nodesDataSet, edges: edgesDataSet };
@@ -203,7 +237,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             groups: groupStyles,
             interaction: {
                 hover: true,
-                tooltipDelay: 200,
+                tooltipDelay: 0,
                 dragNodes: true,
                 dragView: true,
                 zoomView: true
@@ -216,7 +250,6 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
                 
-                // If the node is not the root, open the detail sheet
                 if (nodeId) {
                      setSelectedNodeAddress(nodeId);
                      setIsSheetOpen(true);
@@ -225,10 +258,22 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
                 if (nodeId !== walletAddress && onNodeClick) {
                     onNodeClick(nodeId);
                 }
-            } else {
-                // If background is clicked, maybe close sheet or do nothing
-                // setIsSheetOpen(false);
             }
+        });
+        
+        networkInstance.on('hoverNode', ({ node, event }) => {
+            const nodeData = nodes.find(n => n.id === node);
+            if (nodeData) {
+                setTooltipData({ node: nodeData, position: { x: event.clientX, y: event.clientY } });
+            }
+        });
+
+        networkInstance.on('blurNode', () => {
+            setTooltipData({ node: null, position: null });
+        });
+
+        networkInstance.on('dragStart', () => {
+            setTooltipData({ node: null, position: null });
         });
         
         let stabilizationTimeout: NodeJS.Timeout;
@@ -294,6 +339,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
                 <div className="md:col-span-9 lg:col-span-9 h-[800px] bg-gradient-to-br from-slate-900 to-slate-950 rounded-r-lg relative">
                     <div ref={containerRef} className="w-full h-full" />
                     <GraphLegend />
+                    <CustomTooltip node={tooltipData.node} position={tooltipData.position} />
                 </div>
             </CardContent>
             {selectedNodeAddress && (
