@@ -2,67 +2,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LAMPORTS_PER_SOL, PublicKey, Connection } from '@solana/web3.js';
 import type { TokenHolding, WalletDetails } from '@/lib/types';
-import { isValidSolanaAddress } from '@/lib/solana-utils';
+import { isValidSolanaAddress, getTokenPrices, getSolanaPrice } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
-import { unstable_cache } from 'next/cache';
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
 const rpcEndpoint = process.env.SYNDICA_RPC_URL;
-
-const getTokenPrices = unstable_cache(
-    async (mints: string[]) => {
-        if (mints.length === 0 || !heliusApiKey) return {};
-        try {
-            const helius = new Helius(heliusApiKey);
-            const prices: { [mint: string]: number } = {};
-            // Helius getAssetBatch is better but not available in all SDK versions easily.
-            // Let's do it one by one and cache it.
-            const pricePromises = mints.map(async (mint) => {
-                try {
-                    const asset = await helius.rpc.getAsset(mint);
-                    if (asset?.token_info?.price_info?.price_per_token) {
-                        return { mint, price: asset.token_info.price_info.price_per_token };
-                    }
-                } catch (e) {
-                    console.error(`Failed to fetch price for mint ${mint} from Helius`, e);
-                }
-                return { mint, price: null };
-            });
-
-            const results = await Promise.all(pricePromises);
-            
-            for (const result of results) {
-                if (result.price !== null) {
-                    prices[result.mint] = result.price;
-                }
-            }
-            return prices;
-        } catch (error) {
-            console.error("Failed to fetch token prices from Helius:", error);
-            return {};
-        }
-    },
-    ['helius-token-prices'],
-    { revalidate: 60 } // Revalidate every 60 seconds
-);
-
-
-export const getSolanaPrice = unstable_cache(
-    async () => {
-        if (!heliusApiKey) return null;
-        try {
-            const helius = new Helius(heliusApiKey);
-            const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
-            return asset?.token_info?.price_info?.price_per_token ?? null;
-        } catch (error) {
-            console.error("Failed to fetch Solana price from Helius:", error);
-            return null;
-        }
-    },
-    ['helius-solana-price'],
-    { revalidate: 60 }
-);
-
 
 export async function GET(
     request: NextRequest,

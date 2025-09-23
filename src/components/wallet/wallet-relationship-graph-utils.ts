@@ -157,7 +157,8 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
         .map(address => {
             const { txCount } = addressData[address];
             const balance = addressBalances[address] || 0;
-            const balanceUSD = solPrice ? balance * solPrice : 0;
+            // Use live solPrice if available, otherwise use a default for graph visualization
+            const balanceUSD = solPrice ? balance * solPrice : balance * 150; 
             let nodeType = getNodeType(address, balanceUSD);
             let group = nodeType;
             let label = shortenAddress(address, 4);

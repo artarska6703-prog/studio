@@ -3,7 +3,7 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
-import { getSolanaPrice } from "../details/route";
+import { getSolanaPrice } from "@/lib/solana-utils";
 
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
