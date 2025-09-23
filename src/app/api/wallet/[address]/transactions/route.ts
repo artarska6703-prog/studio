@@ -12,11 +12,9 @@ const LAMPORTS_PER_SOL = 1_000_000_000;
 const getTokenPrices = unstable_cache(
     async (mints: string[]) => {
         if (mints.length === 0 || !heliusApiKey) return {};
+        const helius = new Helius(heliusApiKey);
         try {
-            const helius = new Helius(heliusApiKey);
             const prices: { [mint: string]: number } = {};
-            // Helius getAssetBatch is better but not available in all SDK versions easily.
-            // Let's do it one by one and cache it.
             const pricePromises = mints.map(async (mint) => {
                 try {
                     const asset = await helius.rpc.getAsset(mint);
@@ -49,8 +47,8 @@ const getTokenPrices = unstable_cache(
 const getSolanaPrice = unstable_cache(
     async () => {
         if (!heliusApiKey) return null;
+        const helius = new Helius(heliusApiKey);
         try {
-            const helius = new Helius(heliusApiKey);
             const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
             return asset?.token_info?.price_info?.price_per_token ?? null;
         } catch (error) {
