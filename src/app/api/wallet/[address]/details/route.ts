@@ -10,9 +10,10 @@ const heliusApiKey = process.env.HELIUS_API_KEY;
 const rpcEndpoint = process.env.SYNDICA_RPC_URL;
 
 const getTokenPrices = unstable_cache(
-    async (mints: string[], helius: Helius) => {
-        if (mints.length === 0) return {};
+    async (mints: string[]) => {
+        if (mints.length === 0 || !heliusApiKey) return {};
         try {
+            const helius = new Helius(heliusApiKey);
             const prices: { [mint: string]: number } = {};
             // Helius getAssetBatch is better but not available in all SDK versions easily.
             // Let's do it one by one and cache it.
@@ -47,8 +48,10 @@ const getTokenPrices = unstable_cache(
 
 
 const getSolanaPrice = unstable_cache(
-    async (helius: Helius) => {
+    async () => {
+        if (!heliusApiKey) return null;
         try {
+            const helius = new Helius(heliusApiKey);
             const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
             return asset?.token_info?.price_info?.price_per_token ?? null;
         } catch (error) {
@@ -88,7 +91,7 @@ export async function GET(
         ]);
         
         let tokens: TokenHolding[] = [];
-        const tokenMints: string[] = ['So11111111111111111111111111111111111111112']; // Always include SOL
+        const tokenMints: string[] = []; 
 
         if (assets && assets.items) {
             assets.items.forEach(asset => {
@@ -99,13 +102,9 @@ export async function GET(
         }
         
         const [solPrice, tokenPrices] = await Promise.all([
-            getSolanaPrice(helius),
-            getTokenPrices(tokenMints.filter(m => m !== 'So111111111111111111111111111111111111112'), helius)
+            getSolanaPrice(),
+            getTokenPrices(tokenMints)
         ]);
-        
-        if (solPrice) {
-            tokenPrices['So11111111111111111111111111111111111111112'] = solPrice;
-        }
         
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
         const balanceUSD = solPrice ? balance * solPrice : null;

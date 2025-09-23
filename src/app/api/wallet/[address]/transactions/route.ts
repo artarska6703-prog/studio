@@ -4,13 +4,14 @@ import { NextResponse } from "next/server";
 import type { FlattenedTransaction } from "@/lib/types";
 import { unstable_cache } from "next/cache";
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const heliusApiKey = process.env.HELIUS_API_KEY;
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
 const getTokenPrices = unstable_cache(
-    async (mints: string[], helius: Helius) => {
-        if (mints.length === 0) return {};
+    async (mints: string[]) => {
+        if (mints.length === 0 || !heliusApiKey) return {};
         try {
+            const helius = new Helius(heliusApiKey);
             const prices: { [mint: string]: number } = {};
             const pricePromises = mints.map(async (mint) => {
                 try {
@@ -42,8 +43,10 @@ const getTokenPrices = unstable_cache(
 );
 
 const getSolanaPrice = unstable_cache(
-    async (helius: Helius) => {
+    async () => {
+        if (!heliusApiKey) return null;
         try {
+            const helius = new Helius(heliusApiKey);
             const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
             return asset?.token_info?.price_info?.price_per_token ?? null;
         } catch (error) {
@@ -132,7 +135,7 @@ export async function GET(
   req: Request,
   { params }: { params?: { address?: string } }
 ) {
-  if (!HELIUS_API_KEY) {
+  if (!heliusApiKey) {
     return NextResponse.json({ error: "Server configuration error: Helius API key is missing." }, { status: 500 });
   }
 
@@ -141,11 +144,12 @@ export async function GET(
       return NextResponse.json({ error: "No address provided" }, { status: 400 });
     }
     
-    const helius = new Helius(HELIUS_API_KEY);
+    const helius = new Helius(heliusApiKey);
     
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
 
+    // This was the source of the bug. getTransactions is the correct method.
     const transactions = await helius.getTransactions({
       address: params.address,
       options: { limit: 50, before },
@@ -161,8 +165,8 @@ export async function GET(
     const uniqueTokenMints = Array.from(new Set(allTokenMints));
 
     const [solPrice, tokenPrices] = await Promise.all([
-      getSolanaPrice(helius),
-      getTokenPrices(uniqueTokenMints, helius)
+      getSolanaPrice(),
+      getTokenPrices(uniqueTokenMints)
     ]);
     
     const processedTxs = processHeliusTransactions(transactions, params.address, solPrice, tokenPrices);
