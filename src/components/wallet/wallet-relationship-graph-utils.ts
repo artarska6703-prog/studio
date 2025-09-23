@@ -69,8 +69,9 @@ const getMass = (balance: number, balanceUSD: number | null) => {
 
 const getNodeSize = (balance: number, balanceUSD: number | null) => {
     // Prioritize USD for size calculation, but fall back to SOL balance if USD is not available.
-    const value = balanceUSD !== null && balanceUSD > 0 ? balanceUSD : balance;
-    const baseSize = 5 + Math.log1p(value);
+    const value = (balanceUSD !== null && balanceUSD > 0) ? balanceUSD : balance;
+    // Add a fallback for value to prevent Math.log1p(0) which is 0.
+    const baseSize = 5 + Math.log1p(value || 1);
     const type = getNodeType('', balanceUSD);
     
     if (type === 'exchange' || type === 'platform') return baseSize * 3.5;

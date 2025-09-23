@@ -315,7 +315,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                   </div>
                 </div>
                 <WalletNetworkGraph 
-                    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${expandedWallets.size}`}
+                    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${solPrice}`}
                     walletAddress={address}
                     transactions={liveTransactions}
                     addressBalances={addressBalances}
