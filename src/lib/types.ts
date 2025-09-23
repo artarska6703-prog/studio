@@ -2,18 +2,21 @@
 
 export interface TokenHolding {
   mint: string;
+  name: string;
   symbol: string;
   amount: number;   // human-readable (decimals applied)
-  price: number;    // USD per token
-  valueUSD: number; // amount * price
+  decimals: number;
+  valueUSD: number | null; // amount * price
+  icon?: string;
+  tokenStandard: any;
 }
 
 export interface WalletDetails {
   address: string;
   sol: {
     balance: number;   // in SOL (not lamports)
-    price: number;     // USD per SOL
-    valueUSD: number;  // balance * price
+    price: number | null;     // USD per SOL
+    valueUSD: number | null;  // balance * price
   };
   tokens: TokenHolding[];
 }
@@ -30,25 +33,30 @@ export interface ParsedTransfer {
 }
 
 export interface Transaction {
-  signature?: string;
+  signature: string;
   timestamp?: number;
   blockTime?: number;
+  blockNumber?: number;
+  fee?: number;
   feePayer?: string;
-  type?: string;
+  type?: any;
+  status?: string;
   instructions?: Array<{ programId?: string }>;
   nativeTransfers?: ParsedTransfer[];
   tokenTransfers?: ParsedTransfer[];
+  events?: any;
 }
 
 export interface FlattenedTransaction extends Transaction {
-  blockTime?: number;
+  blockTime: number;
   type: "received" | "sent" | "program_interaction";
   amount: number;           // signed (+in/-out)
   symbol: string | null;    // "SOL" or SPL symbol
   mint: string | null;      // SPL mint
-  from?: string;
-  to?: string;
-  by?: string;
+  from: string | null;
+  to: string | null;
+  by: string;
+  instruction: string;
   interactedWith: string[];
-  valueUSD: number;         // always numeric (>= 0)
+  valueUSD: number | null;         // always numeric (>= 0)
 }
