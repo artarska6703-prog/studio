@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { LAMPORTS_PER_SOL, PublicKey, Connection } from '@solana/web3.js';
 import type { TokenHolding, WalletDetails } from '@/lib/types';
@@ -6,7 +7,7 @@ import { Helius } from "helius-sdk";
 import { unstable_cache } from 'next/cache';
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
-const rpcEndpoint = process.env.SYNDICA_RPC_URL;
+const rpcEndpoint = "https://solana-mainnet.api.syndica.io/api-key/4kc7afJfAHBE2BvjRPSNR8RcdcJxSEtc6oMqaDnEDzX8Mx5zYZRFXT67dHLmJNqcccdW817WZaM4edyHNqLp8839nq3W9DRaay6";
 
 const getTokenPrices = unstable_cache(
     async (mints: string[]) => {

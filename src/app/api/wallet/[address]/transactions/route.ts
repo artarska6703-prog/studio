@@ -1,3 +1,4 @@
+
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
@@ -5,7 +6,7 @@ import type { FlattenedTransaction, Transaction } from "@/lib/types";
 
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
+const SYNDICA_RPC_URL = "https://solana-mainnet.api.syndica.io/api-key/4kc7afJfAHBE2BvjRPSNR8RcdcJxSEtc6oMqaDnEDzX8Mx5zYZRFXT67dHLmJNqcccdW817WZaM4edyHNqLp8839nq3W9DRaay6";
 
 const processHeliusTransactions = (transactions: Transaction[], walletAddress: string): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
