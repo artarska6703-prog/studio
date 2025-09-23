@@ -126,8 +126,10 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                 setTransactions(uniqueTransactions);
                 
                 // For now, pagination is only supported for the root address
-                if (transactionResults[0]?.nextCursor) {
-                    setNextSignature(transactionResults[0].nextCursor);
+                const rootResult = await fetch(`/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}`);
+                const rootData = await rootResult.json();
+                if (rootData.nextCursor) {
+                    setNextSignature(rootData.nextCursor);
                 }
 
             } catch (e: any) {
@@ -241,7 +243,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             </Alert>
         )}
 
-        <Tabs defaultValue="transactions" className="w-full">
+        <Tabs defaultValue="graph" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
                 <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -314,7 +316,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                   </div>
                 </div>
                 <WalletNetworkGraph 
-                    key={useMockData ? `mock-${mockScenario}-${address}` : `real-${address}-${Array.from(expandedWallets).join('-')}`}
+                    key={useMockData ? `mock-${mockScenario}` : `real-${address}`}
                     walletAddress={address}
                     transactions={liveTransactions}
                     onNodeClick={handleExpandNode}
@@ -326,5 +328,3 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     </div>
   );
 }
-
-    
