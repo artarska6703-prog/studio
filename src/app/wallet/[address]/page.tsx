@@ -1,9 +1,6 @@
-
-import { notFound } from 'next/navigation';
-import { isValidSolanaAddress } from '@/lib/solana-utils';
-import WalletPageClient from '@/components/wallet/wallet-page-client';
-import { Suspense } from 'react';
-import Loading from './loading';
+import { WalletPageView } from "@/components/wallet/wallet-page-view";
+import { isValidSolanaAddress } from "@/lib/solana-utils";
+import { notFound } from "next/navigation";
 
 type WalletPageProps = {
   params: {
@@ -11,14 +8,16 @@ type WalletPageProps = {
   };
 };
 
-export default function WalletPage({ params: { address } }: WalletPageProps) {
+export default async function WalletPage({ params }: WalletPageProps) {
+  const { address } = await params;
+
   if (!isValidSolanaAddress(address)) {
     notFound();
   }
-
+  
   return (
-    <Suspense fallback={<Loading />}>
-      <WalletPageClient address={address} />
-    </Suspense>
+      <WalletPageView 
+          address={address}
+      />
   );
 }
