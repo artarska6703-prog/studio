@@ -77,14 +77,14 @@ const getNodeSize = (balance: number) => {
 
 const createTooltipElement = (data: { [key: string]: string | number | undefined }) => {
     const tooltip = document.createElement('div');
-    tooltip.className = 'p-2 bg-card text-card-foreground rounded-lg border border-border shadow-lg max-w-xs';
+    tooltip.className = 'p-1 bg-popover text-popover-foreground rounded-lg border border-border shadow-lg max-w-xs text-xs';
     
     let content = `
-        <div class="px-1 pb-1 border-b border-border">
-            <p class="font-bold capitalize text-sm">${data.type || 'Wallet'}</p>
+        <div class="px-2 py-1 border-b border-border">
+            <p class="font-bold capitalize">${data.type || 'Wallet'}</p>
             <p class="text-xs text-muted-foreground font-code">${shortenAddress(data.address as string, 10)}</p>
         </div>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-1 pt-2 px-1">
+        <div class="grid grid-cols-2 gap-x-2 gap-y-1 p-2">
     `;
     
     const stats: (keyof typeof data)[] = ['balance', 'interactionVolume', 'transactions', 'hops'];
@@ -94,8 +94,8 @@ const createTooltipElement = (data: { [key: string]: string | number | undefined
          if(value !== undefined) {
              let formattedKey = key.replace(/([A-Z])/g, ' $1');
              content += `
-                <div class="text-xs text-muted-foreground capitalize">${formattedKey}:</div>
-                <div class="text-xs font-medium font-code text-right">${value}</div>
+                <div class="text-muted-foreground capitalize">${formattedKey}:</div>
+                <div class="font-medium font-code text-right">${value}</div>
             `;
         }
     }
@@ -251,3 +251,4 @@ export const groupStyles: Options['groups'] = {
 
 
     
+
