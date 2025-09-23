@@ -1,8 +1,7 @@
+// src/components/wallet/wallet-page-client.tsx
+"use client";
 
-
-'use client';
-
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Header } from "@/components/layout/header";
 import { BalanceCard } from "@/components/wallet/balance-card";
 import { TransactionTable } from "@/components/wallet/transaction-table";
@@ -24,6 +23,7 @@ import { PortfolioCompositionChart } from '@/components/wallet/portfolio-composi
 import type { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import TransactionsPageClient from './transactions-page-client';
 
 const TXN_PAGE_SIZE = 50;
 
@@ -71,10 +71,13 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
             if (!detailsRes.ok) throw new Error((await detailsRes.json()).message || 'Failed to fetch wallet details');
             setWalletDetails(await detailsRes.json());
 
-            const rootTxData = await fetchTransactionsForAddress(address);
-            setTransactions(rootTxData.transactions || []);
-            setAddressBalances(rootTxData.addressBalances || {});
-            setNextSignature(rootTxData.nextCursor);
+            // We are using a different component for transactions now so we don't need to fetch them here initially.
+            // This simplifies the initial load.
+            // const rootTxData = await fetchTransactionsForAddress(address);
+            // setTransactions(rootTxData.transactions || []);
+            // setAddressBalances(rootTxData.addressBalances || {});
+            // setNextSignature(rootTxData.nextCursor);
+
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -92,7 +95,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
         setNextSignature(null);
     }
     // This effect should only run when the root address changes or when we toggle mock data
-  }, [address, useMockData, fetchTransactionsForAddress]);
+  }, [address, useMockData]);
 
 
   const handleExpandNode = useCallback(async (nodeAddress: string) => {
@@ -103,7 +106,6 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     try {
         const newData = await fetchTransactionsForAddress(nodeAddress);
         
-        // Merge new data without causing a full reload
         setTransactions(prev => {
             const existingSignatures = new Set(prev.map(tx => tx.signature));
             const newUniqueTxs = (newData.transactions || []).filter((tx: Transaction) => !existingSignatures.has(tx.signature));
@@ -112,7 +114,6 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
 
         setAddressBalances(prev => ({ ...prev, ...(newData.addressBalances || {}) }));
         
-        // Add the newly fetched address to the expanded set
         setExpandedWallets(prev => new Set(prev).add(nodeAddress));
 
     } catch (e: any) {
@@ -123,82 +124,11 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
   }, [useMockData, expandedWallets, isExpanding, fetchTransactionsForAddress]);
 
 
-  const fetchMoreTransactions = useCallback(async () => {
-    if (!nextSignature || isFetchingMore || useMockData) {
-        return;
-    }
-
-    setIsFetchingMore(true);
-    try {
-        const url = `/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}&before=${nextSignature}`;
-        const txRes = await fetch(url);
-        
-        if (!txRes.ok) {
-          const errorData = await txRes.json();
-          throw new Error(`API failed: ${errorData.error || txRes.statusText}`);
-        }
-        
-        const txData = await txRes.json();
-         if (txData.error) {
-          throw new Error(txData.error);
-        }
-        
-        setTransactions(prev => [...prev, ...(txData.transactions || [])]);
-        setAddressBalances(prev => ({ ...prev, ...txData.addressBalances }));
-        setNextSignature(txData.nextCursor);
-
-    } catch (e: any) {
-        setError(e.message);
-        setNextSignature(null); // Stop fetching on error
-    } finally {
-        setIsFetchingMore(false);
-    }
-  }, [address, isFetchingMore, nextSignature, useMockData]);
-
-  const handleToggleDataSource = (checked: boolean) => {
-    setUseMockData(checked);
-    setExpandedWallets(new Set([address])); // Reset expanded wallets when toggling
-  };
-
-  const handleScenarioChange = (value: string) => {
-    setMockScenario(value as MockScenario);
-  };
-  
-  const liveTransactions = useMemo(() => {
-    let allTransactions: (FlattenedTransaction | Transaction)[] = [];
-    if (useMockData) {
-        return (() => {
-             switch (mockScenario) {
-                case 'whale':
-                    return getWhaleTxs(address);
-                case 'degen':
-                    return getDegenTxs(address);
-                case 'balanced':
-                default:
-                    return getBalancedTxs(address);
-            }
-        })();
-    } else {
-      allTransactions = transactions;
-    }
-    
-    // Apply date range filter to all transactions
-    if (dateRange?.from) {
-      return allTransactions.filter(tx => 
-        tx.blockTime ? isWithinInterval(new Date(tx.blockTime * 1000), { 
-            start: startOfDay(dateRange.from!), 
-            end: dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from!)
-        }) : true
-      );
-    }
-    
-    return allTransactions;
-
-  }, [useMockData, transactions, mockScenario, address, dateRange]);
-
   const displayedDetails = useMemo(() => {
     if (useMockData) {
-      return { address: address, sol: { balance: 1234.56, price: 150, valueUSD: 1234.56 * 150 }, tokens: [] };
+      // Create some mock details for the graph to use
+      const MOCK_SOL_PRICE = 150;
+      return { address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [] };
     }
     return walletDetails;
   }, [useMockData, walletDetails, address]);
@@ -208,11 +138,22 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     return displayedDetails.sol.price;
   }, [displayedDetails]);
 
+  const liveTransactions = useMemo(() => {
+    if (useMockData) {
+        switch (mockScenario) {
+            case 'whale': return getWhaleTxs(address);
+            case 'degen': return getDegenTxs(address);
+            case 'balanced': default: return getBalancedTxs(address);
+        }
+    }
+    return transactions;
+  }, [useMockData, transactions, mockScenario, address]);
+
   if (isLoading && !useMockData) {
       return <Loading />;
   }
 
-  if (error && !walletDetails && !useMockData) { // Only show full-page error if initial data fails
+  if (error && !walletDetails && !useMockData) {
     return (
         <div className="flex flex-col min-h-screen">
             <Header />
@@ -230,17 +171,13 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     )
   }
 
-  if (!displayedDetails && !useMockData) {
-    return <Loading />; // Should be covered by isLoading but as a fallback
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 space-y-8">
         <WalletHeader address={address} />
         
-         {error && ( // Show non-critical errors without blocking the UI
+         {error && !isLoading && (
             <Alert variant="destructive">
                 <Terminal className="h-4 w-4" />
                 <AlertTitle>An error occurred</AlertTitle>
@@ -248,7 +185,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
             </Alert>
         )}
 
-        <Tabs defaultValue="graph" className="w-full">
+        <Tabs defaultValue="portfolio" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
                 <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -256,29 +193,26 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
             </TabsList>
             <TabsContent value="portfolio" className="mt-6 space-y-8">
                  <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                    {displayedDetails && (
-                        <BalanceCard
-                            balance={displayedDetails.sol.balance}
-                            balanceUSD={displayedDetails.sol.valueUSD}
-                            className="lg:col-span-1"
-                        />
-                    )}
-                    {displayedDetails && <TokenTable tokens={displayedDetails.tokens} className="md:col-span-2" />}
+                    {displayedDetails ? (
+                        <>
+                          <BalanceCard
+                              balance={displayedDetails.sol.balance}
+                              balanceUSD={displayedDetails.sol.valueUSD}
+                              className="lg:col-span-1"
+                          />
+                          <TokenTable tokens={displayedDetails.tokens} className="md:col-span-2" />
+                        </>
+                    ) : isLoading ? (
+                        <>
+                          <div className="lg:col-span-1"><p>Loading Balance...</p></div>
+                          <div className="md:col-span-2"><p>Loading Tokens...</p></div>
+                        </>
+                    ) : <p>No details to display.</p>}
                 </div>
-                {displayedDetails && <PortfolioCompositionChart walletDetails={displayedDetails} />}
+                {displayedDetails ? <PortfolioCompositionChart walletDetails={displayedDetails} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
-                <TransactionTable 
-                    transactions={liveTransactions as FlattenedTransaction[]} 
-                    allTokens={displayedDetails?.tokens || []}
-                    walletAddress={address}
-                    onLoadMore={fetchMoreTransactions}
-                    hasMore={useMockData ? false : !!nextSignature}
-                    isLoadingMore={isFetchingMore}
-                    totalTransactions={liveTransactions.length}
-                    dateRange={dateRange}
-                    setDateRange={setDateRange}
-                />
+                <TransactionsPageClient address={address} />
             </TabsContent>
             <TabsContent value="graph" className="mt-6">
                 <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-4">
@@ -287,7 +221,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                         <Switch
                           id="data-source-toggle"
                           checked={useMockData}
-                          onCheckedChange={handleToggleDataSource}
+                          onCheckedChange={setUseMockData}
                           aria-label="Toggle between real and mock data"
                         />
                         <Label htmlFor="data-source-toggle">
@@ -296,7 +230,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                     </div>
 
                     {useMockData && (
-                        <Select onValueChange={handleScenarioChange} defaultValue={mockScenario}>
+                        <Select onValueChange={(v) => setMockScenario(v as MockScenario)} defaultValue={mockScenario}>
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Select scenario" />
                             </SelectTrigger>

@@ -1,17 +1,10 @@
-
-
-'use client';
-
+// src/components/wallet/portfolio-composition-chart.tsx
 import { useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import type { WalletDetails } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { WalletDetails } from '@/lib/types';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { formatCurrency } from '@/lib/utils';
-import { Skeleton } from '../ui/skeleton';
 
-interface PortfolioCompositionChartProps {
-  walletDetails: WalletDetails | null;
-}
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -47,57 +40,41 @@ const CustomTooltip = ({ active, payload }: any) => {
         </div>
       );
     }
-  
     return null;
 };
 
+
+interface PortfolioCompositionChartProps {
+  walletDetails: WalletDetails;
+}
+
 export function PortfolioCompositionChart({ walletDetails }: PortfolioCompositionChartProps) {
-    const chartData = useMemo(() => {
-        if (!walletDetails) return [];
-
-        const data = [];
-        if (walletDetails.sol.valueUSD && walletDetails.sol.valueUSD > 0) {
-            data.push({ name: 'SOL', value: walletDetails.sol.valueUSD });
-        }
-
-        walletDetails.tokens.forEach(token => {
-            if (token.valueUSD && token.valueUSD > 1) { // Only include tokens with some value
-                data.push({ name: token.symbol, value: token.valueUSD });
-            }
-        });
-        
-        return data.sort((a,b) => b.value - a.value);
-
-    }, [walletDetails]);
-
-    const totalValue = useMemo(() => chartData.reduce((sum, item) => sum + item.value, 0), [chartData]);
+  const chartData = useMemo(() => {
+    if (!walletDetails) return [];
     
-    if (!walletDetails) {
-        return (
-             <Card>
-                <CardHeader>
-                    <CardTitle>Portfolio Composition</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="w-full h-[350px]" />
-                </CardContent>
-            </Card>
-        )
-    }
+    const data = [
+      { name: "SOL", value: walletDetails.sol.valueUSD },
+      ...walletDetails.tokens.map((t) => ({ name: t.symbol, value: t.valueUSD })),
+    ].filter((d) => d.value > 0.01); // Filter out dust
 
-    if (chartData.length === 0) {
-        return (
-             <Card>
-                <CardHeader>
-                    <CardTitle>Portfolio Composition</CardTitle>
-                </CardHeader>
-                <CardContent className="h-[350px] flex items-center justify-center">
-                    <p className="text-muted-foreground">No significant holdings to display.</p>
-                </CardContent>
-            </Card>
-        )
-    }
+    return data.sort((a,b) => b.value - a.value);
 
+  }, [walletDetails]);
+
+  const totalValue = useMemo(() => chartData.reduce((sum, item) => sum + item.value, 0), [chartData]);
+  
+  if (!chartData.length) {
+    return (
+      <Card>
+        <CardHeader>
+            <CardTitle>Portfolio Composition</CardTitle>
+        </CardHeader>
+        <CardContent className="h-[350px] flex items-center justify-center">
+            <p className="text-muted-foreground">No significant holdings to display.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -135,7 +112,7 @@ export function PortfolioCompositionChart({ walletDetails }: PortfolioCompositio
                             paddingLeft: '40px'
                         }}
                         formatter={(value, entry) => {
-                            const { color, payload } = entry;
+                            const { payload } = entry;
                             const percent = totalValue > 0 ? (payload.value / totalValue) * 100 : 0;
                             return (
                                 <span style={{ color: 'hsl(var(--foreground))' }}>

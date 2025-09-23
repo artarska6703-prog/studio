@@ -1,64 +1,54 @@
 // src/lib/types.ts
 
-import { EnrichedTransaction, TokenStandard, TransactionType } from "helius-sdk";
-
 export interface TokenHolding {
   mint: string;
-  name: string;
   symbol: string;
-  amount: number;
-  decimals: number;
-  valueUSD: number | null;
-  icon?: string | null;
-  tokenStandard?: TokenStandard;
-  price?: number;
+  amount: number;   // human-readable (decimals applied)
+  price: number;    // USD per token
+  valueUSD: number; // amount * price
 }
-
-export type FlattenedTransaction = Omit<EnrichedTransaction, 'type'> & {
-    type: 'sent' | 'received' | 'program_interaction';
-    amount: number;
-    symbol: string | null;
-    mint: string | null;
-    from: string | null;
-    to: string | null;
-    by: string | null;
-    instruction: TransactionType;
-    interactedWith: string[];
-    valueUSD: number;
-    blockTime?: number; // Add blockTime here as well for consistency
-};
-
-
-export type Transaction = EnrichedTransaction & {
-  blockTime?: number;
-  timestamp?: number;
-};
 
 export interface WalletDetails {
   address: string;
   sol: {
-    balance: number;
-    price: number;
-    valueUSD: number;
+    balance: number;   // in SOL (not lamports)
+    price: number;     // USD per SOL
+    valueUSD: number;  // balance * price
   };
   tokens: TokenHolding[];
 }
 
-export interface GraphNode {
-  id: string;
-  balance: number;
-  transactionCount: number;
-  type: string;
-  notes: string;
+/** Minimal shapes from Helius parse; expand if you have stricter types */
+export interface ParsedTransfer {
+  fromUserAccount?: string;
+  toUserAccount?: string;
+  owner?: string;
+  amount?: number;          // raw amount (lamports for SOL; integer for SPL)
+  tokenAmount?: number;     // SPL: decimal-adjusted amount if present
+  decimals?: number;        // SPL: token decimals if present
+  mint?: string;            // SPL mint
 }
 
-export interface GraphLink {
-  source: string;
-  target: string;
-  value: number;
+export interface Transaction {
+  signature?: string;
+  timestamp?: number;
+  blockTime?: number;
+  feePayer?: string;
+  type?: string;
+  instructions?: Array<{ programId?: string }>;
+  nativeTransfers?: ParsedTransfer[];
+  tokenTransfers?: ParsedTransfer[];
 }
 
-export type HistoricalBalanceData = {
-    date: string;
-    balance: number | null;
+export interface FlattenedTransaction extends Transaction {
+  blockTime?: number;
+  type: "received" | "sent" | "program_interaction";
+  amount: number;           // signed (+in/-out)
+  symbol: string | null;    // "SOL" or SPL symbol
+  mint: string | null;      // SPL mint
+  from?: string;
+  to?: string;
+  by?: string;
+  interactedWith: string[];
+  valueUSD: number;         // always numeric (>= 0)
 }

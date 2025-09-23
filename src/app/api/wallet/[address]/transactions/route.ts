@@ -145,24 +145,11 @@ export async function GET(
 
     const processed = processHeliusTransactions(txs, address, prices, tokenList);
 
-    // optional: balances for addresses interacted with (kept for parity)
-    const addrSet = new Set<string>();
-    for (const t of processed) {
-      if (t.from) addrSet.add(t.from);
-      if (t.to) addrSet.add(t.to);
-    }
-    const addrArr = Array.from(addrSet);
-    const infos = addrArr.length
-      ? await connection.getMultipleAccountsInfo(addrArr.map((a) => new PublicKey(a)))
-      : [];
-    const addressBalances: Record<string, number> = {};
-    infos.forEach((acc, i) => {
-      addressBalances[addrArr[i]] = acc ? acc.lamports / LAMPORTS_PER_SOL : 0;
-    });
-
     const nextCursor = signatures[signatures.length - 1]?.signature || null;
 
-    return NextResponse.json({ transactions: processed, nextCursor, addressBalances });
+    // The old code returned addressBalances, but the new transactions page client doesn't use it.
+    // Returning only what's needed.
+    return NextResponse.json({ transactions: processed, nextCursor });
   } catch (err: any) {
     console.error("[transactions] error:", err);
     return NextResponse.json({ error: err?.message || "Unknown" }, { status: 500 });

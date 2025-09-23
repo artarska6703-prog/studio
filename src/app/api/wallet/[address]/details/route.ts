@@ -4,7 +4,7 @@ import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import { getTokenPrices } from "@/lib/price-utils";
 import { loadTokenMap } from "@/lib/token-list";
-import type { WalletDetails, TokenHolding } from "@/lib/types";
+import type { WalletDetails } from "@/lib/types";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
