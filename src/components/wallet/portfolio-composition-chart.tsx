@@ -7,7 +7,7 @@ import { Skeleton } from "../ui/skeleton";
 
 
 interface PortfolioCompositionChartProps {
-  solValue: number;
+  solValue: number | null;
   tokens: TokenHolding[];
 }
 
@@ -70,7 +70,7 @@ export function PortfolioCompositionChart({ solValue, tokens }: PortfolioComposi
 
   const totalValue = useMemo(() => chartData.reduce((sum, item) => sum + item.value, 0), [chartData]);
   
-  if (!chartData) {
+  if (solValue === null) {
       return (
             <Card>
               <CardHeader>

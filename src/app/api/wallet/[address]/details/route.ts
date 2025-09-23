@@ -131,7 +131,7 @@ export async function GET(
                 .filter(token => token.amount > 0);
         }
 
-        const walletDetails: WalletDetails = { address, sol: { balance: balance, price: solPrice, valueUSD: balanceUSD }, tokens };
+        const walletDetails: WalletDetails = { address, sol: { balance, price: solPrice, valueUSD: balanceUSD }, tokens };
         
         return NextResponse.json(walletDetails);
 
@@ -139,7 +139,7 @@ export async function GET(
         console.error(`[API WALLET DETAILS] Failed to fetch for ${address}:`, error);
         // It's possible the account doesn't exist, which can be a valid case (e.g., empty wallet).
         if (error.message && error.message.includes('could not find account')) {
-             const walletDetails: WalletDetails = { address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
+             const walletDetails: WalletDetails = { address, sol: { balance: 0, price: null, valueUSD: 0 }, tokens: [] };
              return NextResponse.json(walletDetails);
         }
         return NextResponse.json({ message: `Failed to fetch wallet details: ${error.message}` }, { status: 500 });

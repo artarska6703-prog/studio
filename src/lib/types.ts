@@ -34,14 +34,14 @@ export interface ParsedTransfer {
 
 export interface Transaction {
   signature: string;
-  timestamp?: number;
+  timestamp: number;
   blockTime?: number;
   blockNumber?: number;
   fee?: number;
-  feePayer?: string;
-  type?: any;
+  feePayer: string;
+  type: any;
   status?: string;
-  instructions?: Array<{ programId?: string }>;
+  instructions: Array<{ programId?: string }>;
   nativeTransfers?: ParsedTransfer[];
   tokenTransfers?: ParsedTransfer[];
   events?: any;
