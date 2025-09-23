@@ -36,7 +36,6 @@ export async function GET(
             helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 }),
         ]);
         
-        let tokens: TokenHolding[] = [];
         const tokenMints = new Set<string>(['So11111111111111111111111111111111111111112']);
 
         if (assets && assets.items) {
@@ -53,6 +52,7 @@ export async function GET(
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
         const balanceUSD = solPrice ? balance * solPrice : null;
 
+        let tokens: TokenHolding[] = [];
         if (assets && assets.items) {
              tokens = assets.items
                 .filter(asset => asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance)

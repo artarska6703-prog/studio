@@ -1,39 +1,50 @@
+
 import { Helius } from "helius-sdk";
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
 
 /**
- * Fetches prices for a list of token mints using the Helius API.
+ * Fetches prices for a list of token mints using the Helius API with a Jupiter fallback.
  * @param mints An array of token mint addresses.
  * @returns A promise that resolves to a map of mint addresses to their prices.
  */
 export const getTokenPrices = async (mints: string[]): Promise<{ [mint: string]: number }> => {
-    if (mints.length === 0 || !heliusApiKey) return {};
+    if (mints.length === 0) return {};
     
-    const helius = new Helius(heliusApiKey);
     const prices: { [mint: string]: number } = {};
-    
-    try {
-        const assets = await helius.rpc.getAssetBatch({ ids: mints });
-        assets.forEach(asset => {
-            if (asset && asset.id && asset.token_info?.price_info?.price_per_token) {
-                prices[asset.id] = asset.token_info.price_info.price_per_token;
-            }
-        });
+    const mintsToFetch = new Set(mints);
 
-    } catch (e) {
-        console.error("[Price Utils] Helius getAssetBatch failed. Falling back to Jupiter for required mints.", e);
+    // 1. Try Helius first
+    if (heliusApiKey) {
+        const helius = new Helius(heliusApiKey);
         try {
-            const jupiterResponse = await fetch(`https://price.jup.ag/v6/price?ids=${mints.join(',')}`);
+            const assets = await helius.rpc.getAssetBatch({ ids: Array.from(mintsToFetch) });
+            assets.forEach(asset => {
+                if (asset && asset.id && asset.token_info?.price_info?.price_per_token) {
+                    prices[asset.id] = asset.token_info.price_info.price_per_token;
+                    mintsToFetch.delete(asset.id);
+                }
+            });
+        } catch (e) {
+            console.error("[Price Utils] Helius getAssetBatch failed. Will try Jupiter for all mints.", e);
+        }
+    }
+
+    // 2. Fallback to Jupiter for any remaining mints
+    if (mintsToFetch.size > 0) {
+        try {
+            const jupiterResponse = await fetch(`https://price.jup.ag/v6/price?ids=${Array.from(mintsToFetch).join(',')}`);
             if (jupiterResponse.ok) {
                 const jupiterData = await jupiterResponse.json();
                 if (jupiterData.data) {
-                    for (const mint of mints) {
+                    for (const mint of mintsToFetch) {
                         if (jupiterData.data[mint]) {
                             prices[mint] = jupiterData.data[mint].price;
                         }
                     }
                 }
+            } else {
+                 console.error(`[Price Utils] Jupiter API request failed with status: ${jupiterResponse.status}`);
             }
         } catch (jupiterError) {
              console.error("[Price Utils] Fallback to Jupiter for prices failed.", jupiterError);
