@@ -1,6 +1,6 @@
 
 'use client'
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { DiagnosticData } from '@/components/wallet/wallet-relationship-graph';
@@ -40,26 +40,34 @@ const WalletRelationshipDiagnosticDashboard = () => {
     };
 
     const transactions = getTransactionsForScenario(walletAddress, scenario);
+    
+    const [diagnosticData, setDiagnosticData] = useState<DiagnosticData | null>(null);
 
-    const diagnosticData: DiagnosticData | null = useMemo(() => {
+    useEffect(() => {
         if (transactions.length === 0) {
-            return null;
+            setDiagnosticData(null);
+            return;
         }
-        const { nodes, links } = processTransactions(transactions, walletAddress);
-        return {
+
+        // The default physics values are now dynamic, so we'll start with a representative set
+        // for the initial render, and it would be updated from the graph page if this were
+        // a real-time diagnostic dashboard connected to the graph state.
+        const initialPhysics = {
+            solver: "barnesHut",
+            gravitationalConstant: -8000,
+            centralGravity: 0.1,
+            springLength: 120,
+            springConstant: 0.08,
+            damping: 0.09,
+            avoidOverlap: 0.7,
+        };
+
+        const { nodes, links } = processTransactions(transactions, walletAddress, 5);
+        setDiagnosticData({
             nodes,
             links,
-            // These are default/representative physics values for diagnostics
-            physics: {
-                solver: "barnesHut",
-                gravitationalConstant: -8000,
-                centralGravity: 0.1,
-                springLength: 120,
-                springConstant: 0.08,
-                damping: 0.09,
-                avoidOverlap: 0.7,
-            }
-        };
+            physics: initialPhysics
+        });
     }, [transactions, walletAddress]);
 
 
@@ -129,3 +137,5 @@ export default function DiagnosticPage() {
         </div>
     )
 }
+
+    

@@ -79,6 +79,18 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
     const [minTransactions, setMinTransactions] = useState(1);
     const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(ALL_NODE_TYPES);
 
+    const [physicsState, setPhysicsState] = useState<PhysicsState>({
+        solver: "barnesHut",
+        gravitationalConstant: -8000,
+        centralGravity: 0.1,
+        springLength: 120,
+        springConstant: 0.08,
+        damping: 0.09,
+        avoidOverlap: 0.7,
+    });
+    
+    const debouncedPhysics = useDebounce(physicsState, 200);
+
     const handleNodeTypeToggle = (nodeType: string, checked: boolean) => {
         setVisibleNodeTypes(prev => 
             checked ? [...prev, nodeType] : prev.filter(t => t !== nodeType)
@@ -103,7 +115,10 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
     }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes]);
-
+    
+    useEffect(() => {
+        onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });
+    }, [nodes, links, physicsState, onDiagnosticDataUpdate]);
     
     useEffect(() => {
         if (!containerRef.current) return;
@@ -118,18 +133,19 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             height: '100%',
             width: '100%',
             physics: {
-                solver: "barnesHut",
+                solver: debouncedPhysics.solver as any,
                 barnesHut: {
-                    gravitationalConstant: -8000,
-                    centralGravity: 0.1,
-                    springLength: 120,
-                    springConstant: 0.08,
-                    damping: 0.09,
-                    avoidOverlap: 0.7
+                    gravitationalConstant: debouncedPhysics.gravitationalConstant,
+                    centralGravity: debouncedPhysics.centralGravity,
+                    springLength: debouncedPhysics.springLength,
+                    springConstant: debouncedPhysics.springConstant,
+                    damping: debouncedPhysics.damping,
+                    avoidOverlap: debouncedPhysics.avoidOverlap,
                 },
                 stabilization: {
                   enabled: true,
-                  iterations: 1000
+                  iterations: 1000,
+                  fit: true,
                 },
             },
             nodes: {
@@ -204,13 +220,23 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             }
         });
         
-        networkInstance.on("stabilizationIterationsDone", () => {
-            networkInstance.setOptions({ physics: false });
+        let stabilizationTimeout: NodeJS.Timeout;
+        networkInstance.on("stabilizationStarted", () => {
+            clearTimeout(stabilizationTimeout);
         });
 
-        return () => { networkInstance.destroy(); };
+        networkInstance.on("stabilizationIterationsDone", () => {
+             stabilizationTimeout = setTimeout(() => {
+                networkInstance.setOptions({ physics: false });
+            }, 1000);
+        });
+        
+        return () => { 
+            clearTimeout(stabilizationTimeout);
+            networkInstance.destroy();
+        };
 
-    }, [nodes, links]);
+    }, [nodes, links, debouncedPhysics]);
     
     useEffect(() => {
         if (!isSheetOpen) {
@@ -222,10 +248,10 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
         <>
         <Card className="bg-transparent border-0 shadow-none">
             <CardContent className="grid grid-cols-1 md:grid-cols-12 gap-0 p-0">
-                <div className="md:col-span-3 lg:col-span-3 bg-background p-6 rounded-l-lg">
+                <div className="md:col-span-3 lg:col-span-3 bg-background p-6 rounded-l-lg overflow-y-auto max-h-[800px]">
                     <div className="space-y-6">
                          <div>
-                            <h4 className="font-semibold mb-4 text-foreground">Graph Controls</h4>
+                            <h4 className="font-semibold mb-4 text-foreground">Graph Filters</h4>
                             <div className="space-y-4">
                                 <div>
                                     <Label className="text-sm">Min Volume (USD): ${minVolume.toLocaleString()}</Label>
@@ -238,6 +264,24 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
                                 <div>
                                     <Label className="text-sm">Max Depth: {maxDepth}</Label>
                                     <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={5} step={1} />
+                                </div>
+                            </div>
+                        </div>
+                        <Separator />
+                         <div>
+                            <h4 className="font-semibold mb-4 text-foreground">Physics Controls</h4>
+                            <div className="space-y-4">
+                                 <div>
+                                    <Label className="text-sm">Gravity: {-physicsState.gravitationalConstant}</Label>
+                                    <Slider value={[-physicsState.gravitationalConstant]} onValueChange={(v) => setPhysicsState(p => ({...p, gravitationalConstant: -v[0]}))} min={0} max={20000} step={1000}/>
+                                </div>
+                                <div>
+                                    <Label className="text-sm">Spring Length: {physicsState.springLength}</Label>
+                                    <Slider value={[physicsState.springLength]} onValueChange={(v) => setPhysicsState(p => ({...p, springLength: v[0]}))} min={50} max={500} step={10}/>
+                                </div>
+                                <div>
+                                    <Label className="text-sm">Spring Strength: {physicsState.springConstant}</Label>
+                                    <Slider value={[physicsState.springConstant]} onValueChange={(v) => setPhysicsState(p => ({...p, springConstant: v[0]}))} min={0.01} max={0.5} step={0.01}/>
                                 </div>
                             </div>
                         </div>
@@ -277,3 +321,5 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
         </>
     );
 }
+
+    
