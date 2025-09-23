@@ -38,9 +38,8 @@ type WalletPageProps = {
 };
 
 export default function WalletPage({ params }: WalletPageProps) {
-  const { address } = params;
-
-  if (!isValidSolanaAddress(address)) {
+  
+  if (!isValidSolanaAddress(params.address)) {
     notFound();
   }
 
@@ -63,7 +62,7 @@ export default function WalletPage({ params }: WalletPageProps) {
 
         setIsFetchingMore(true);
         try {
-            const url = `/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}&before=${nextSignature}`;
+            const url = `/api/wallet/${params.address}/transactions?limit=${TXN_PAGE_SIZE}&before=${nextSignature}`;
             const txRes = await fetch(url);
             
             if (!txRes.ok) {
@@ -86,7 +85,7 @@ export default function WalletPage({ params }: WalletPageProps) {
         } finally {
             setIsFetchingMore(false);
         }
-    }, [address, isFetchingMore, nextSignature, useMockData]);
+    }, [params.address, isFetchingMore, nextSignature, useMockData]);
     
     const fetchTransactionsForAddress = useCallback(async (wallet: string) => {
         const url = `/api/wallet/${wallet}/transactions?limit=${TXN_PAGE_SIZE}`;
@@ -118,7 +117,7 @@ export default function WalletPage({ params }: WalletPageProps) {
             
             try {
                 // Fetch details for the root address
-                const detailsRes = await fetch(`/api/wallet/${address}/details`);
+                const detailsRes = await fetch(`/api/wallet/${params.address}/details`);
                 if (!detailsRes.ok) {
                     const errorData = await detailsRes.json();
                     throw new Error(errorData.message || 'Failed to fetch wallet details');
@@ -127,7 +126,7 @@ export default function WalletPage({ params }: WalletPageProps) {
                 setWalletDetails(detailsData);
                 
                 // Fetch transactions for root and all expanded addresses
-                const allAddressesToFetch = [address, ...Array.from(expandedWallets)];
+                const allAddressesToFetch = [params.address, ...Array.from(expandedWallets)];
                 const transactionPromises = allAddressesToFetch.map(addr => fetchTransactionsForAddress(addr));
                 
                 const results = await Promise.all(transactionPromises);
@@ -151,7 +150,7 @@ export default function WalletPage({ params }: WalletPageProps) {
                 setAddressBalances(combinedBalances);
                 
                 // For now, pagination is only supported for the root address from its own initial fetch
-                const rootResult = results.find((r, i) => allAddressesToFetch[i] === address);
+                const rootResult = results.find((r, i) => allAddressesToFetch[i] === params.address);
                 if (rootResult && rootResult.nextCursor) {
                     setNextSignature(rootResult.nextCursor);
                 }
@@ -169,7 +168,7 @@ export default function WalletPage({ params }: WalletPageProps) {
           setIsLoading(false);
           setError(null);
         }
-    }, [address, expandedWallets, useMockData, fetchTransactionsForAddress]);
+    }, [params.address, expandedWallets, useMockData, fetchTransactionsForAddress]);
   
   const handleToggleDataSource = (checked: boolean) => {
     setUseMockData(checked);
@@ -186,16 +185,16 @@ export default function WalletPage({ params }: WalletPageProps) {
         const rawMockTxs = (() => {
              switch (mockScenario) {
                 case 'whale':
-                    return getWhaleTxs(address);
+                    return getWhaleTxs(params.address);
                 case 'degen':
-                    return getDegenTxs(address);
+                    return getDegenTxs(params.address);
                 case 'balanced':
                 default:
-                    return getBalancedTxs(address);
+                    return getBalancedTxs(params.address);
             }
         })();
         // The mock data needs the same processing as the real data.
-        const { nodes } = processTransactions(rawMockTxs, address, 5, {});
+        const { nodes } = processTransactions(rawMockTxs, params.address, 5, {});
         const balances = new Map(nodes.map(n => [n.id, n.balance]));
         
         allTransactions = rawMockTxs.map(tx => ({
@@ -221,7 +220,7 @@ export default function WalletPage({ params }: WalletPageProps) {
     
     return allTransactions;
 
-  }, [useMockData, transactions, mockScenario, address, dateRange]);
+  }, [useMockData, transactions, mockScenario, params.address, dateRange]);
 
   if (isLoading && !useMockData) {
       return <Loading />;
@@ -250,14 +249,14 @@ export default function WalletPage({ params }: WalletPageProps) {
   }
 
   const displayedDetails = useMockData 
-    ? { address: address, balance: 1234.56, balanceUSD: 1234.56 * 150, tokens: [] } // Fake details for mock
+    ? { address: params.address, balance: 1234.56, balanceUSD: 1234.56 * 150, tokens: [] } // Fake details for mock
     : walletDetails;
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 space-y-8">
-        <WalletHeader address={address} />
+        <WalletHeader address={params.address} />
         
          {error && !isLoading && ( // Show non-critical errors without blocking the UI
             <Alert variant="destructive">
@@ -290,7 +289,7 @@ export default function WalletPage({ params }: WalletPageProps) {
                 <TransactionTable 
                     transactions={liveTransactions as FlattenedTransaction[]} 
                     allTokens={displayedDetails?.tokens || []}
-                    walletAddress={address}
+                    walletAddress={params.address}
                     onLoadMore={fetchMoreTransactions}
                     hasMore={useMockData ? false : !!nextSignature}
                     isLoadingMore={isFetchingMore}
@@ -332,7 +331,7 @@ export default function WalletPage({ params }: WalletPageProps) {
                       <DatePickerWithRange date={dateRange} setDate={setDateRange} />
                       {dateRange && <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)}>Clear</Button>}
                       <Button asChild variant="outline">
-                        <Link href={`/diagnostic?address=${address}&scenario=${useMockData ? mockScenario : 'real'}`}>
+                        <Link href={`/diagnostic?address=${params.address}&scenario=${useMockData ? mockScenario : 'real'}`}>
                           <LineChart className="mr-2 h-4 w-4"/>
                           View Diagnostics
                         </Link>
@@ -340,8 +339,8 @@ export default function WalletPage({ params }: WalletPageProps) {
                   </div>
                 </div>
                 <WalletNetworkGraph 
-                    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${expandedWallets.size}`}
-                    walletAddress={address}
+                    key={useMockData ? `mock-${mockScenario}` : `real-${params.address}-${expandedWallets.size}`}
+                    walletAddress={params.address}
                     transactions={liveTransactions}
                     addressBalances={addressBalances}
                     onNodeClick={handleExpandNode}
@@ -353,3 +352,5 @@ export default function WalletPage({ params }: WalletPageProps) {
     </div>
   );
 }
+
+    
