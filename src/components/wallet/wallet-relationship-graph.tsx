@@ -276,7 +276,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             }
         });
 
-        networkInstance.on('blurNode', (), => {
+        networkInstance.on('blurNode', () => {
             setTooltipData({ node: null, position: null });
         });
 
