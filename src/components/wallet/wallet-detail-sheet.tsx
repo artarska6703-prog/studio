@@ -3,7 +3,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, ExternalLink } from 'lucide-react';
@@ -195,6 +195,9 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                             </div>
                         </div>
                     </SheetTitle>
+                    <SheetDescription>
+                        A summary of this wallet's balance, holdings, and recent activity.
+                    </SheetDescription>
                 </SheetHeader>
 
                 <div className="p-4 space-y-4 overflow-y-auto flex-1">

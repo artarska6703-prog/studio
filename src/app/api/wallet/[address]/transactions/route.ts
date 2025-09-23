@@ -41,7 +41,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                         by: tx.feePayer,
                         instruction: tx.type,
                         interactedWith: Array.from(new Set([tx.feePayer, transfer.fromUserAccount, transfer.toUserAccount].filter(a => a && a !== walletAddress))),
-                        valueUSD: valueUSD, // Use the fixed calculation
+                        valueUSD: valueUSD,
                     });
                 }
             });
@@ -114,7 +114,7 @@ export async function GET(
     const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
 
     // Ensure parsedTxs is an array before processing
-    const processedTxs = processHeliusTransactions(parsedTxs || [], params.address);
+    const processedTxs = processHeliusTransactions(Array.isArray(parsedTxs) ? parsedTxs : [], params.address);
     
     const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
 
