@@ -35,7 +35,7 @@ const processHeliusTransactions = (
           transfer.toUserAccount === walletAddress ||
           transfer.owner === walletAddress;
 
-        if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
+        if (isOwnerInvolved && (transfer.amount > 0 || (transfer.tokenAmount && transfer.tokenAmount > 0) )) {
           hasRelevantTransfer = true;
           
           const amountRaw = isNative
