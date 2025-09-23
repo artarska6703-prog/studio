@@ -31,8 +31,10 @@ export function BalanceCard({ balance, balanceUSD, className }: BalanceCardProps
           {displayBalance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
           <span className="text-2xl text-muted-foreground ml-2">SOL</span>
         </div>
-        {balanceUSD !== null && (
+        {balanceUSD !== null ? (
             <p className="text-lg text-muted-foreground mt-2">{formatCurrency(balanceUSD)}</p>
+        ) : (
+            <p className="text-sm text-amber-500 mt-2">Price data not available</p>
         )}
       </CardContent>
     </Card>

@@ -73,7 +73,7 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
                     {token.amount.toLocaleString('en-US', { maximumFractionDigits: 4, })}
                   </TableCell>
                    <TableCell className="text-right font-code">
-                    {token.valueUSD !== null ? formatCurrency(token.valueUSD) : <Skeleton className="h-5 w-16 ml-auto" />}
+                    {token.valueUSD !== null ? formatCurrency(token.valueUSD) : <span className="text-xs text-muted-foreground">Not available</span>}
                   </TableCell>
                 </TableRow>
               )) : (
