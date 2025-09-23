@@ -3,7 +3,7 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
-import { getTokenPrices, getSolanaPrice } from "@/lib/price-utils";
+import { getTokenPrices } from "@/lib/price-utils";
 
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
@@ -13,6 +13,7 @@ const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
+    const solPrice = prices['So11111111111111111111111111111111111111112'] || null;
 
     transactions.forEach(tx => {
         let hasRelevantTransfer = false;
@@ -129,16 +130,8 @@ export async function GET(
         }
     });
     
-    const [prices, solPrice] = await Promise.all([
-        getTokenPrices(Array.from(tokenMints)),
-        getSolanaPrice()
-    ]);
+    const prices = await getTokenPrices(Array.from(tokenMints));
     
-    if(solPrice) {
-        prices['So11111111111111111111111111111111111111112'] = solPrice;
-    }
-
-
     const processedTxs = processHeliusTransactions(txArray, params.address, prices);
     
     const allAddresses = new Set<string>();

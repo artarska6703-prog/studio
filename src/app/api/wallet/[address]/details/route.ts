@@ -4,7 +4,7 @@ import { LAMPORTS_PER_SOL, PublicKey, Connection } from '@solana/web3.js';
 import type { TokenHolding, WalletDetails } from '@/lib/types';
 import { isValidSolanaAddress } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
-import { getTokenPrices, getSolanaPrice } from '@/lib/price-utils';
+import { getTokenPrices } from '@/lib/price-utils';
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
 const rpcEndpoint = process.env.SYNDICA_RPC_URL;
@@ -31,24 +31,24 @@ export async function GET(
         const helius = new Helius(heliusApiKey);
         const connection = new Connection(rpcEndpoint, 'confirmed');
 
-        const [solBalanceLamports, assets, solPrice] = await Promise.all([
+        const [solBalanceLamports, assets] = await Promise.all([
             connection.getBalance(new PublicKey(address)),
             helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 }),
-            getSolanaPrice()
         ]);
         
         let tokens: TokenHolding[] = [];
-        const tokenMints: string[] = []; 
+        const tokenMints = new Set<string>(['So11111111111111111111111111111111111111112']);
 
         if (assets && assets.items) {
             assets.items.forEach(asset => {
                  if (asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance && asset.token_info.balance > 0) {
-                     tokenMints.push(asset.id);
+                     tokenMints.add(asset.id);
                  }
             });
         }
         
-        const tokenPrices = await getTokenPrices(tokenMints);
+        const tokenPrices = await getTokenPrices(Array.from(tokenMints));
+        const solPrice = tokenPrices['So11111111111111111111111111111111111111112'] || null;
         
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
         const balanceUSD = solPrice ? balance * solPrice : null;
