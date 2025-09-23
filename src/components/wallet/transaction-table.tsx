@@ -419,3 +419,5 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
     </Card>
   );
 }
+
+    
