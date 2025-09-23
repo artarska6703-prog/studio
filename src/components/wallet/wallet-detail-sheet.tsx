@@ -161,8 +161,8 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         const aggregateVolume = (txs: FlattenedTransaction[]) => {
             const volumeMap: Record<string, number> = {};
             txs.forEach(tx => {
-                if (tx.valueUSD && tx.valueUSD > 0) {
-                    const symbol = tx.symbol || shortenAddress(tx.mint || 'Unknown', 4);
+                if (tx?.valueUSD && tx.valueUSD > 0) {
+                    const symbol = tx?.symbol || shortenAddress(tx?.mint || 'Unknown', 4);
                     volumeMap[symbol] = (volumeMap[symbol] || 0) + tx.valueUSD;
                 }
             });
@@ -274,5 +274,7 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         </Sheet>
     );
 }
+
+    
 
     
