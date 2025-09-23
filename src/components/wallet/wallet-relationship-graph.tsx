@@ -210,8 +210,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
         networkInstance.on('click', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
-                const clickedNode = nodes.find(n => n.id === nodeId);
-                if (clickedNode && clickedNode.type !== 'root' && onNodeClick) {
+                if (nodeId !== walletAddress && onNodeClick) {
                     onNodeClick(nodeId);
                 }
             }
@@ -233,7 +232,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             networkInstance.destroy();
         };
 
-    }, [nodes, links, physicsState, onNodeClick, router]);
+    }, [nodes, links, physicsState, onNodeClick, walletAddress, router]);
 
     return (
         <Card className="bg-transparent border-0 shadow-none">
