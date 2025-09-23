@@ -55,10 +55,8 @@ const AddressDisplay = ({ address }: { address: string | null }) => {
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5 group cursor-pointer">
-                        <Link href={`/wallet/${address}`} className="font-code hover:underline" onClick={(e) => e.stopPropagation()}>
-                            {shortenAddress(address, 8)}
-                        </Link>
+                    <div className="flex items-center gap-1.5 group cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                        <span className="font-code hover:underline">{shortenAddress(address, 8)}</span>
                         <div className="w-4 h-4 shrink-0">
                             {copied 
                                 ? <Check className="w-3 h-3 text-green-500" /> 
@@ -431,3 +429,5 @@ export function TransactionTable({
     </Card>
   );
 }
+
+    
