@@ -1,7 +1,7 @@
 
 let cached: Map<string, string> | null = null;
 let lastFetch = 0;
-const TTL = 5 * 60 * 1000; // 5 min
+const TTL = 5 * 60 * 1000; // 5 minutes
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export async function loadTokenMap(): Promise<Map<string, string>> {
