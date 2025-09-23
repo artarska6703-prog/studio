@@ -4,7 +4,6 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import { getTokenPrices } from "@/lib/price-utils";
-import { loadTokenMap } from "@/lib/token-list";
 import type { WalletDetails, TokenHolding } from "@/lib/types";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
@@ -14,80 +13,46 @@ export async function GET(
   req: Request,
   { params }: { params: { address: string } }
 ) {
-  if (!HELIUS_API_KEY) {
-    return NextResponse.json({ error: "HELIUS_API_KEY missing" }, { status: 500 });
-  }
-  if (!SYNDICA_RPC_URL) {
-    return NextResponse.json({ error: "SYNDICA_RPC_URL missing" }, { status: 500 });
-  }
   const { address } = params || {};
   if (!address) {
     return NextResponse.json({ error: "No address param" }, { status: 400 });
   }
 
   try {
-    const helius = new Helius(HELIUS_API_KEY);
-    const connection = new Connection(SYNDICA_RPC_URL, "confirmed");
+    const helius = new Helius(HELIUS_API_KEY!);
+    const connection = new Connection(SYNDICA_RPC_URL!, "confirmed");
     const pubkey = new PublicKey(address);
 
-    // 1) Fetch assets owned by wallet
     const assets = await helius.rpc.getAssetsByOwner({
       ownerAddress: pubkey.toBase58(),
     });
 
-    // 2) Build set of mints (include SOL mint always)
-    const SOL_MINT = "So11111111111111111111111111111111111111112";
-    const tokenMints = new Set<string>([SOL_MINT]);
+    const tokenMints = [
+      "So11111111111111111111111111111111111111112"
+    ];
 
-    if (assets && assets.items) {
-        assets.items.forEach(asset => {
-             if (asset.interface === 'FungibleToken' && asset.id && asset.token_info?.balance && asset.token_info.balance > 0) {
-                 tokenMints.add(asset.id);
-             }
-        });
-    }
+    const tokenPrices = await getTokenPrices(tokenMints);
 
-    // 3) Fetch prices + token symbols
-    const [prices, tokenMap] = await Promise.all([
-      getTokenPrices(Array.from(tokenMints)),
-      loadTokenMap(),
-    ]);
+    const tokens: TokenHolding[] = (assets.items || [])
+      .filter((asset: any) => asset.interface === 'FungibleToken' && asset.content?.metadata)
+      .filter((asset: any) => asset.price_info)
+      .map((asset: any) => ({
+        mint: asset.id,
+        symbol: asset.content.metadata.symbol,
+        amount: asset.token_info.balance / (10 ** asset.token_info.decimals),
+        price: asset.price_info.price_per_token,
+        valueUSD: asset.price_info.total_price,
+      }));
 
-    // 4) Compose tokens list
-    let tokens: TokenHolding[] = [];
-    if (assets && assets.items) {
-         tokens = assets.items
-            .filter(asset => asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance)
-            .map(asset => {
-                const mint = asset.id as string;
-                const price = prices[mint] ?? 0;
-                const amount = asset.token_info.balance / (10 ** asset.token_info.decimals);
-                const valueUSD = amount * price;
-
-                return {
-                    mint: asset.id,
-                    name: asset.content.metadata.name || 'Unknown Token',
-                    symbol: asset.content.metadata.symbol || '???',
-                    amount: amount,
-                    decimals: asset.token_info.decimals,
-                    valueUSD: valueUSD,
-                    icon: asset.content.files?.[0]?.uri,
-                    tokenStandard: asset.token_info.token_program as any,
-                    price: price,
-                };
-            })
-            .filter(token => token.amount > 0);
-    }
-
-    // 5) SOL balance/value
     const lamports = await connection.getBalance(pubkey);
-    const solBalance = lamports / LAMPORTS_PER_SOL;
-    const solPrice = prices[SOL_MINT] ?? 0;
-    const solValueUSD = solBalance * solPrice;
+    const balance = lamports / LAMPORTS_PER_SOL;
+    const solPrice = tokenPrices["So11111111111111111111111111111111111111112"];
+    const balanceUSD = solPrice ? balance * solPrice : null;
 
     const response: WalletDetails = {
       address,
-      sol: { balance: solBalance, price: solPrice, valueUSD: solValueUSD },
+      balance,
+      balanceUSD,
       tokens,
     };
 
@@ -95,13 +60,9 @@ export async function GET(
   } catch (err: any) {
     console.error("[details] error:", err);
     if (err.message && err.message.includes('could not find account')) {
-         const walletDetails: WalletDetails = { 
-            address, 
-            sol: { balance: 0, price: 0, valueUSD: 0 }, 
-            tokens: [] 
-        };
+         const walletDetails: WalletDetails = { address, balance: 0, balanceUSD: 0, tokens: [] };
          return NextResponse.json(walletDetails);
     }
-    return NextResponse.json({ message: `Failed to fetch wallet details: ${err.message}` }, { status: 500 });
+    return NextResponse.json({ error: `Failed to fetch wallet details: ${err.message}` }, { status: 500 });
   }
 }

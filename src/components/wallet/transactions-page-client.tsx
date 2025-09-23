@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -79,7 +80,7 @@ export default function TransactionsPageClient({ address }: TransactionsPageClie
                     <TableCell>{t.type}</TableCell>
                     <TableCell>{t.symbol ?? (t.mint ? shortenAddress(t.mint, 4): "—")}</TableCell>
                     <TableCell className={t.amount < 0 ? 'text-red-400' : 'text-green-400'}>{t.amount.toLocaleString()}</TableCell>
-                    <TableCell>{formatCurrency(t.valueUSD)}</TableCell>
+                    <TableCell>{t.valueUSD ? formatCurrency(t.valueUSD) : 'N/A'}</TableCell>
                     <TableCell className="font-code text-xs">
                       {(t.from ? shortenAddress(t.from, 4) : "—")} → {(t.to ? shortenAddress(t.to, 4) : "—")}
                     </TableCell>

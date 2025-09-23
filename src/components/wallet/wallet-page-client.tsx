@@ -1,3 +1,4 @@
+
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -25,7 +26,7 @@ import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import TransactionsPageClient from './transactions-page-client';
 
-const TXN_PAGE_SIZE = 50;
+const TXN_PAGE_SIZE = 100;
 
 type MockScenario = 'balanced' | 'whale' | 'degen';
 
@@ -37,8 +38,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
   const [addressBalances, setAddressBalances] = useState<{ [key: string]: number }>({});
-  const [expandedWallets, setExpandedWallets] = useState<Set<string>>(new Set([address]));
-  const [isExpanding, setIsExpanding] = useState<boolean>(false);
+  const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,36 +47,49 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
-  const fetchTransactionsForAddress = useCallback(async (wallet: string) => {
-    const url = `/api/wallet/${wallet}/transactions?limit=${TXN_PAGE_SIZE}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(`Failed to fetch transactions for ${wallet}: ${errorData.error || res.statusText}`);
+  const fetchTransactions = useCallback(async (fetchAddress: string, before?: string) => {
+    setIsFetchingMore(true);
+    setError(null);
+    try {
+        const url = `/api/wallet/${fetchAddress}/transactions?limit=${TXN_PAGE_SIZE}${before ? `&before=${before}`: ''}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to fetch transactions');
+        }
+        const data = await res.json();
+        
+        setAllTransactions(prev => {
+            const existingSigs = new Set(prev.map(t => t.signature));
+            const newTxs = data.transactions.filter((tx: Transaction) => !existingSigs.has(tx.signature));
+            return [...prev, ...newTxs];
+        });
+
+        setAddressBalances(prev => ({...prev, ...data.addressBalances}));
+        setNextSignature(data.nextCursor);
+
+    } catch (e: any) {
+        setError(e.message);
+    } finally {
+        setIsFetchingMore(false);
     }
-    const data = await res.json();
-    if (data.error) {
-        throw new Error(`Failed to fetch transactions for ${wallet}: ${data.error}`);
-    }
-    return data;
   }, []);
+
   
-  // Effect for initial load and for fetching data for newly expanded wallets
   useEffect(() => {
     const fetchInitialData = async () => {
         setIsLoading(true);
         setError(null);
+        setAllTransactions([]);
+        setNextSignature(null);
+
         try {
             const detailsRes = await fetch(`/api/wallet/${address}/details`);
             if (!detailsRes.ok) throw new Error((await detailsRes.json()).message || 'Failed to fetch wallet details');
             setWalletDetails(await detailsRes.json());
-
-            // We are using a different component for transactions now so we don't need to fetch them here initially.
-            // This simplifies the initial load.
-            // const rootTxData = await fetchTransactionsForAddress(address);
-            // setTransactions(rootTxData.transactions || []);
-            // setAddressBalances(rootTxData.addressBalances || {});
-            // setNextSignature(rootTxData.nextCursor);
+            
+            // Initial transaction fetch
+            await fetchTransactions(address);
 
         } catch (e: any) {
             setError(e.message);
@@ -90,52 +103,24 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     } else {
         setIsLoading(false);
         setError(null);
-        setTransactions([]);
-        setAddressBalances({});
+        setAllTransactions([]);
         setNextSignature(null);
     }
-    // This effect should only run when the root address changes or when we toggle mock data
-  }, [address, useMockData]);
-
-
-  const handleExpandNode = useCallback(async (nodeAddress: string) => {
-    if (useMockData || expandedWallets.has(nodeAddress) || isExpanding) return;
-
-    setIsExpanding(true);
-    setError(null);
-    try {
-        const newData = await fetchTransactionsForAddress(nodeAddress);
-        
-        setTransactions(prev => {
-            const existingSignatures = new Set(prev.map(tx => tx.signature));
-            const newUniqueTxs = (newData.transactions || []).filter((tx: Transaction) => !existingSignatures.has(tx.signature));
-            return [...prev, ...newUniqueTxs];
-        });
-
-        setAddressBalances(prev => ({ ...prev, ...(newData.addressBalances || {}) }));
-        
-        setExpandedWallets(prev => new Set(prev).add(nodeAddress));
-
-    } catch (e: any) {
-        setError(`Failed to expand ${nodeAddress}: ${e.message}`);
-    } finally {
-        setIsExpanding(false);
-    }
-  }, [useMockData, expandedWallets, isExpanding, fetchTransactionsForAddress]);
+  }, [address, useMockData, fetchTransactions]);
 
 
   const displayedDetails = useMemo(() => {
     if (useMockData) {
       // Create some mock details for the graph to use
       const MOCK_SOL_PRICE = 150;
-      return { address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [] };
+      return { address: address, balance: 1234.56, balanceUSD: 1234.56 * MOCK_SOL_PRICE, tokens: [] };
     }
     return walletDetails;
   }, [useMockData, walletDetails, address]);
   
   const solPrice = useMemo(() => {
     if (!displayedDetails) return null;
-    return displayedDetails.sol.price;
+    return displayedDetails.balanceUSD && displayedDetails.balance ? displayedDetails.balanceUSD / displayedDetails.balance : null;
   }, [displayedDetails]);
 
   const liveTransactions = useMemo(() => {
@@ -146,8 +131,28 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
             case 'balanced': default: return getBalancedTxs(address);
         }
     }
-    return transactions;
-  }, [useMockData, transactions, mockScenario, address]);
+    return allTransactions;
+  }, [useMockData, allTransactions, mockScenario, address]);
+  
+  const filteredTransactions = useMemo(() => {
+    if (!dateRange || !dateRange.from) return liveTransactions;
+    
+    return liveTransactions.filter(tx => {
+      if (!tx.blockTime) return false;
+      const txDate = new Date(tx.blockTime * 1000);
+      return isWithinInterval(txDate, {
+        start: startOfDay(dateRange.from!),
+        end: endOfDay(dateRange.to || dateRange.from!),
+      });
+    });
+  }, [liveTransactions, dateRange]);
+
+
+  const handleLoadMore = () => {
+    if (nextSignature && !isFetchingMore) {
+        fetchTransactions(address, nextSignature);
+    }
+  }
 
   if (isLoading && !useMockData) {
       return <Loading />;
@@ -192,12 +197,12 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                 <TabsTrigger value="graph">Graph</TabsTrigger>
             </TabsList>
             <TabsContent value="portfolio" className="mt-6 space-y-8">
-                 <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                 <div className="grid gap-8 md:grid-cols-3">
                     {displayedDetails ? (
                         <>
                           <BalanceCard
-                              balance={displayedDetails.sol.balance}
-                              balanceUSD={displayedDetails.sol.valueUSD}
+                              balance={displayedDetails.balance}
+                              balanceUSD={displayedDetails.balanceUSD}
                           />
                           <TokenTable tokens={displayedDetails.tokens} className="md:col-span-2" />
                         </>
@@ -208,10 +213,20 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                         </>
                     ) : <p>No details to display.</p>}
                 </div>
-                {displayedDetails ? <PortfolioCompositionChart walletDetails={displayedDetails} /> : <p>Loading Chart...</p>}
+                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.balanceUSD} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
-                <TransactionsPageClient address={address} />
+                 <TransactionTable 
+                    transactions={filteredTransactions} 
+                    allTokens={walletDetails?.tokens || []}
+                    walletAddress={address}
+                    onLoadMore={handleLoadMore}
+                    hasMore={!!nextSignature}
+                    isLoadingMore={isFetchingMore}
+                    totalTransactions={liveTransactions.length}
+                    dateRange={dateRange}
+                    setDateRange={setDateRange}
+                 />
             </TabsContent>
             <TabsContent value="graph" className="mt-6">
                 <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-4">
@@ -271,7 +286,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                     transactions={liveTransactions}
                     addressBalances={addressBalances}
                     solPrice={solPrice}
-                    onNodeClick={handleExpandNode}
+                    onNodeClick={() => { /* Expansion handled by load more now */}}
                 />
             </TabsContent>
         </Tabs>

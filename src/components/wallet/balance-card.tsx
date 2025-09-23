@@ -1,13 +1,15 @@
+
 // src/components/wallet/balance-card.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
 
 interface BalanceCardProps {
   balance: number;
-  balanceUSD: number;
+  balanceUSD: number | null;
 }
 
 export function BalanceCard({ balance, balanceUSD }: BalanceCardProps) {
+  const formatUSD = (n: number) =>
+    n.toLocaleString(undefined, { style: "currency", currency: "USD" });
 
   return (
     <Card>
@@ -18,10 +20,12 @@ export function BalanceCard({ balance, balanceUSD }: BalanceCardProps) {
       </CardHeader>
       <CardContent>
         <div className="text-4xl font-bold font-headline">
-          {balance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
+          {balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
           <span className="text-2xl text-muted-foreground ml-2">SOL</span>
         </div>
-        <p className="text-lg text-muted-foreground mt-2">{formatCurrency(balanceUSD)}</p>
+        <p className="text-lg text-muted-foreground mt-2">
+          {balanceUSD !== null ? formatUSD(balanceUSD) : 'USD value not available'}
+        </p>
       </CardContent>
     </Card>
   );
