@@ -6,21 +6,23 @@ import { isValidSolanaAddress } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
 import { getTokenPrices } from '@/lib/price-utils';
 
-const heliusApiKey = process.env.HELIUS_API_KEY;
-const rpcEndpoint = process.env.SYNDICA_RPC_URL;
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
 
 export async function GET(
     request: NextRequest,
     { params }: { params: { address: string } }
 ) {
-    const { address } = params;
-
-    if (!heliusApiKey) {
-        return NextResponse.json({ message: 'Server configuration error: Helius API key is not configured.' }, { status: 500 });
+    if (!HELIUS_API_KEY) {
+        return NextResponse.json({ error: "HELIUS_API_KEY missing" }, { status: 500 });
     }
-     if (!rpcEndpoint) {
-        return NextResponse.json({ message: 'Server configuration error: RPC endpoint is not configured.' }, { status: 500 });
+    if (!SYNDICA_RPC_URL) {
+        return NextResponse.json({ error: "SYNDICA_RPC_URL missing" }, { status: 500 });
+    }
+    const { address } = params || {};
+    if (!address) {
+        return NextResponse.json({ error: "No address param" }, { status: 400 });
     }
 
     if (!isValidSolanaAddress(address)) {
@@ -28,8 +30,8 @@ export async function GET(
     }
 
     try {
-        const helius = new Helius(heliusApiKey);
-        const connection = new Connection(rpcEndpoint, 'confirmed');
+        const helius = new Helius(HELIUS_API_KEY);
+        const connection = new Connection(SYNDICA_RPC_URL, 'confirmed');
 
         const [solBalanceLamports, assets] = await Promise.all([
             connection.getBalance(new PublicKey(address)),
@@ -47,7 +49,7 @@ export async function GET(
         }
         
         const tokenPrices = await getTokenPrices(Array.from(tokenMints));
-        const solPrice = tokenPrices['So11111111111111111111111111111111111111112'] || 0;
+        const solPrice = tokenPrices['So11111111111111111111111111111111111111112'] ?? 0;
         
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
         const balanceUSD = balance * solPrice;
