@@ -429,7 +429,3 @@ export function TransactionTable({
     </Card>
   );
 }
-
-    
-
-    
