@@ -1,14 +1,36 @@
 
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Helius, TransactionType } from "helius-sdk";
+import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
+import { unstable_cache } from "next/cache";
 
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string): FlattenedTransaction[] => {
+const getSolanaPrice = unstable_cache(
+    async () => {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd', {
+                next: { revalidate: 60 } // Revalidate every 60 seconds
+            });
+            if (!response.ok) {
+                console.error("CoinGecko API request failed:", response.status, await response.text());
+                return null;
+            }
+            const data = await response.json();
+            return data.solana.usd;
+        } catch (error) {
+            console.error("Failed to fetch Solana price from CoinGecko:", error);
+            return null;
+        }
+    },
+    ['solana-price'],
+    { revalidate: 60 }
+);
+
+const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, solPrice: number | null): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
 
@@ -27,8 +49,12 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
-                    // Crude value calculation, only for SOL. Full token pricing is complex.
-                    const valueUSD = (isNative && tx.events?.nft?.amount) ? (tx.events.nft.amount / LAMPORTS_PER_SOL) * 150 : null;
+                    let valueUSD = null;
+                    if (isNative && solPrice) {
+                        valueUSD = amountRaw * solPrice;
+                    } else if (tx.events?.nft?.amount) { // Fallback for NFT sales
+                        valueUSD = (tx.events.nft.amount / LAMPORTS_PER_SOL) * (solPrice || 150); // use 150 as fallback
+                    }
 
                     flattenedTxs.push({
                         ...tx,
@@ -99,10 +125,10 @@ export async function GET(
     const limit = parseInt(searchParams.get("limit") || "50", 10);
     const before = searchParams.get("before") || undefined;
 
-    const signatures = await connection.getSignaturesForAddress(pubkey, {
-      limit,
-      before
-    });
+    const [solPrice, signatures] = await Promise.all([
+        getSolanaPrice(),
+        connection.getSignaturesForAddress(pubkey, { limit, before })
+    ]);
     
     if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null });
@@ -112,8 +138,14 @@ export async function GET(
     
     const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
 
-    // Ensure parsedTxs is an array before processing
-    const processedTxs = processHeliusTransactions(parsedTxs || [], params.address);
+    // We need to merge the blockTime from signatures into the parsedTxs
+    const signatureTimeMap = new Map(signatures.map(s => [s.signature, s.blockTime]));
+    const transactionsWithTime = parsedTxs.map(tx => ({
+        ...tx,
+        blockTime: signatureTimeMap.get(tx.signature) || tx.timestamp, // Fallback to timestamp
+    }));
+
+    const processedTxs = processHeliusTransactions(transactionsWithTime || [], params.address, solPrice);
     
     const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
 
