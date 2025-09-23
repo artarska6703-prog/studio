@@ -22,32 +22,22 @@ const getSolanaPrice = async () => {
 
 const getTokenPrices = async (mints: string[]) => {
     if (mints.length === 0 || !heliusApiKey) return {};
-    try {
-        const helius = new Helius(heliusApiKey);
-        const prices: { [mint: string]: number } = {};
-        
-        const batchSize = 100;
-        for (let i = 0; i < mints.length; i += batchSize) {
-            const batchMints = mints.slice(i, i + batchSize);
-            if (batchMints.length > 0) {
-              const priceData = await helius.rpc.getPriorityFeeEstimate({
-                // @ts-ignore
-                account: batchMints
-              });
-              if(priceData.token_data) {
-                for (const token of priceData.token_data) {
-                  prices[token.mint] = token.price
-                }
-              }
-            }
-        }
-        
-        return prices;
+    const helius = new Helius(heliusApiKey);
+    const prices: { [mint: string]: number } = {};
 
-    } catch (error) {
-        console.error("Failed to fetch token prices from Helius:", error);
-        return {};
-    }
+    const pricePromises = mints.map(mint => 
+        helius.rpc.getAsset(mint).then(asset => ({ mint, price: asset?.token_info?.price_info?.price_per_token }))
+    );
+
+    const results = await Promise.allSettled(pricePromises);
+
+    results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.price) {
+            prices[result.value.mint] = result.value.price;
+        }
+    });
+
+    return prices;
 };
 
 export async function GET(
@@ -123,7 +113,6 @@ export async function GET(
 
     } catch (error: any) {
         console.error(`[API WALLET DETAILS] Failed to fetch for ${address}:`, error);
-        // It's possible the account doesn't exist, which can be a valid case (e.g., empty wallet).
         if (error.message && error.message.includes('could not find account')) {
              const walletDetails: WalletDetails = { address, balance: 0, balanceUSD: 0, tokens: [] };
              return NextResponse.json(walletDetails);

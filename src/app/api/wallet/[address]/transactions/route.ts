@@ -26,6 +26,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
 
     transactions.forEach(tx => {
         let hasRelevantTransfer = false;
+        const blockTime = tx.timestamp || tx.blockTime;
         
         const processTransfers = (transfers: any[] | undefined | null, isNative: boolean) => {
             if (!transfers) return;
@@ -43,7 +44,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
 
                     flattenedTxs.push({
                         ...tx,
-                        blockTime: tx.timestamp || tx.blockTime, // Use timestamp from Helius response
+                        blockTime: blockTime,
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
                         symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
@@ -65,7 +66,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
         if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
             flattenedTxs.push({
                 ...tx,
-                blockTime: tx.timestamp || tx.blockTime, // Also apply fix here
+                blockTime: blockTime,
                 type: 'program_interaction',
                 amount: 0,
                 symbol: null,
@@ -131,7 +132,6 @@ export async function GET(
 
     const processedTxs = processHeliusTransactions(txArray, params.address, solPrice);
     
-    // --- New: Fetch balances for all involved addresses ---
     const allAddresses = new Set<string>();
     processedTxs.forEach(tx => {
       if (tx.from) allAddresses.add(tx.from);
@@ -156,14 +156,13 @@ export async function GET(
             console.error("Failed to fetch batch balances, proceeding without them.", e);
         }
     }
-    // --- End New ---
 
     const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
 
     return NextResponse.json({
       transactions: processedTxs,
       nextCursor,
-      addressBalances, // Return the new balances object
+      addressBalances,
     });
   } catch (err: any) {
     console.error("Error fetching wallet transactions:", err);
