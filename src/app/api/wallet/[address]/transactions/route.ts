@@ -80,8 +80,10 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
 
 export async function GET(
   req: Request,
-  { params }: { params?: { address?: string } }
+  { params }: { params: { address: string } }
 ) {
+  const { address } = params;
+
   if (!HELIUS_API_KEY) {
     return NextResponse.json({ error: "Server configuration error: Helius API key is missing." }, { status: 500 });
   }
@@ -90,7 +92,7 @@ export async function GET(
   }
 
   try {
-    if (!params?.address) {
+    if (!address) {
       return NextResponse.json(
         { error: "No address provided in route params" },
         { status: 400 }
@@ -100,7 +102,7 @@ export async function GET(
     const helius = new Helius(HELIUS_API_KEY!);
     const connection = new Connection(SYNDICA_RPC_URL!, "confirmed");
     
-    const pubkey = new PublicKey(params.address);
+    const pubkey = new PublicKey(address);
 
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
@@ -135,7 +137,7 @@ export async function GET(
     
     const prices = await getTokenPrices(Array.from(tokenMints));
     
-    const processedTxs = processHeliusTransactions(txArray, params.address, prices, tokenList);
+    const processedTxs = processHeliusTransactions(txArray, address, prices, tokenList);
     
     const allAddresses = new Set<string>();
     processedTxs.forEach(tx => {
