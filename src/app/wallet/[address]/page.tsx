@@ -11,9 +11,7 @@ type WalletPageProps = {
   };
 };
 
-export default function WalletPage({ params }: WalletPageProps) {
-  const { address } = params;
-
+export default function WalletPage({ params: { address } }: WalletPageProps) {
   if (!isValidSolanaAddress(address)) {
     notFound();
   }
