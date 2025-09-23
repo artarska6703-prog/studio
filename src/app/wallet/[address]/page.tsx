@@ -353,5 +353,3 @@ export default function WalletPage({ params }: WalletPageProps) {
     </div>
   );
 }
-
-    
