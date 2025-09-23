@@ -8,48 +8,51 @@ const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
 const getTokenPrices = unstable_cache(
-    async (mints: string[]) => {
+    async (mints: string[], helius: Helius) => {
         if (mints.length === 0) return {};
         try {
-            const response = await fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mints.join(',')}&vs_currencies=usd`);
-            if (!response.ok) {
-                console.error(`CoinGecko API request failed for tokens: ${response.status} ${await response.text()}`);
-                return {};
-            }
-            const data = await response.json();
             const prices: { [mint: string]: number } = {};
-            for (const mint of mints) {
-                if (data[mint] && data[mint].usd) {
-                    prices[mint] = data[mint].usd;
+            const pricePromises = mints.map(async (mint) => {
+                try {
+                    const asset = await helius.rpc.getAsset(mint);
+                    if (asset?.token_info?.price_info?.price_per_token) {
+                        return { mint, price: asset.token_info.price_info.price_per_token };
+                    }
+                } catch (e) {
+                    console.error(`Failed to fetch price for mint ${mint} from Helius`, e);
+                }
+                return { mint, price: null };
+            });
+
+            const results = await Promise.all(pricePromises);
+            
+            for (const result of results) {
+                if (result.price !== null) {
+                    prices[result.mint] = result.price;
                 }
             }
             return prices;
         } catch (error) {
-            console.error("Failed to fetch token prices from CoinGecko:", error);
+            console.error("Failed to fetch token prices from Helius:", error);
             return {};
         }
     },
-    ['token-prices'],
-    { revalidate: 60 * 5 } // Revalidate every 5 minutes
+    ['helius-token-prices'],
+    { revalidate: 60 } // Revalidate every 60 seconds
 );
 
 const getSolanaPrice = unstable_cache(
-    async () => {
+    async (helius: Helius) => {
         try {
-            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-            if (!response.ok) {
-                console.error(`CoinGecko API request failed for SOL: ${response.status} ${await response.text()}`);
-                return null;
-            }
-            const data = await response.json();
-            return data.solana.usd as number;
+            const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
+            return asset?.token_info?.price_info?.price_per_token ?? null;
         } catch (error) {
-            console.error("Failed to fetch Solana price from CoinGecko:", error);
+            console.error("Failed to fetch Solana price from Helius:", error);
             return null;
         }
     },
-    ['solana-price'],
-    { revalidate: 60 } // Revalidate every 60 seconds
+    ['helius-solana-price'],
+    { revalidate: 60 }
 );
 
 const processHeliusTransactions = (
@@ -143,7 +146,6 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
 
-    // Correctly fetch enriched transactions for an address
     const transactions = await helius.getTransactions({
       address: params.address,
       options: { limit: 50, before },
@@ -159,8 +161,8 @@ export async function GET(
     const uniqueTokenMints = Array.from(new Set(allTokenMints));
 
     const [solPrice, tokenPrices] = await Promise.all([
-      getSolanaPrice(),
-      getTokenPrices(uniqueTokenMints)
+      getSolanaPrice(helius),
+      getTokenPrices(uniqueTokenMints, helius)
     ]);
     
     const processedTxs = processHeliusTransactions(transactions, params.address, solPrice, tokenPrices);
