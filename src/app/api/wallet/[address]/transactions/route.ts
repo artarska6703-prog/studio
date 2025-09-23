@@ -53,6 +53,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
         if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
             flattenedTxs.push({
                 ...tx,
+                blockTime: tx.blockTime, // Add this line here too
                 type: 'program_interaction',
                 amount: 0,
                 symbol: null,
