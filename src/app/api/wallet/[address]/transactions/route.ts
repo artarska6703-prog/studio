@@ -23,16 +23,16 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
             for (const transfer of transfers) {
                 const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress || transfer.owner === walletAddress;
                 
-                if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
+                if (isOwnerInvolved && transfer.amount > 0) {
                     hasRelevantTransfer = true;
                     
-                    const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.tokenAmount;
+                    const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.amount / Math.pow(10, transfer.decimals ?? 0);
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
                     const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
                     const price = prices[mint];
-                    const valueUSD = typeof price === "number" ? Math.abs(finalAmount) * price : null;
+                    const valueUSD = typeof price === "number" ? Math.abs(amountRaw) * price : null;
                     
                     flattenedTxs.push({
                         ...tx,
