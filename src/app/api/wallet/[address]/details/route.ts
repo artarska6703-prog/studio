@@ -28,6 +28,18 @@ const getTokenPrices = async (mints: string[]) => {
     return prices;
 };
 
+const getSolanaPrice = async () => {
+    if (!heliusApiKey) return null;
+    try {
+        const helius = new Helius(heliusApiKey);
+        const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
+        return asset?.token_info?.price_info?.price_per_token ?? null;
+    } catch (error) {
+        console.error("Failed to fetch Solana price from Helius:", error);
+        return null;
+    }
+};
+
 export async function GET(
     request: NextRequest,
     { params }: { params: { address: string } }
@@ -49,9 +61,10 @@ export async function GET(
         const helius = new Helius(heliusApiKey);
         const connection = new Connection(rpcEndpoint, 'confirmed');
 
-        const [solBalanceLamports, assets] = await Promise.all([
+        const [solBalanceLamports, assets, solPrice] = await Promise.all([
             connection.getBalance(new PublicKey(address)),
-            helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 })
+            helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 }),
+            getSolanaPrice()
         ]);
         
         let tokens: TokenHolding[] = [];
@@ -68,7 +81,7 @@ export async function GET(
         const tokenPrices = await getTokenPrices(tokenMints);
         
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
-        const balanceUSD = balance * 150; // Hardcoded price
+        const balanceUSD = solPrice ? balance * solPrice : null;
 
         if (assets && assets.items) {
              tokens = assets.items

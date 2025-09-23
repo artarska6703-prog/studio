@@ -40,7 +40,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
-                    const valueUSD = isNative ? (Math.abs(finalAmount) * 150) : null;
+                    const valueUSD = isNative && solPrice ? (Math.abs(finalAmount) * solPrice) : null;
                     
                     console.log('USD Calculation:', {
                         isNative,
