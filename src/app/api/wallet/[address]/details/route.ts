@@ -52,7 +52,7 @@ export async function GET(
         const solPrice = tokenPrices['So11111111111111111111111111111111111111112'] ?? 0;
         
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
-        const balanceUSD = balance * solPrice;
+        const valueUSD = balance * solPrice;
 
         let tokens: TokenHolding[] = [];
         if (assets && assets.items) {
@@ -61,7 +61,7 @@ export async function GET(
                 .map(asset => {
                     const amount = asset.token_info.balance / (10 ** asset.token_info.decimals);
                     const price = tokenPrices[asset.id] ?? 0;
-                    const valueUSD = amount * price;
+                    const tokenValueUSD = amount * price;
 
                     return {
                         mint: asset.id,
@@ -69,7 +69,7 @@ export async function GET(
                         symbol: asset.content.metadata.symbol || '???',
                         amount: amount,
                         decimals: asset.token_info.decimals,
-                        valueUSD: valueUSD,
+                        valueUSD: tokenValueUSD,
                         icon: asset.content.files?.[0]?.uri,
                         tokenStandard: asset.token_info.token_program as any,
                     };
@@ -77,14 +77,26 @@ export async function GET(
                 .filter(token => token.amount > 0);
         }
 
-        const walletDetails: WalletDetails = { address, balance, balanceUSD, tokens };
+        const walletDetails: WalletDetails = { 
+            address, 
+            sol: {
+                balance,
+                price: solPrice,
+                valueUSD,
+            },
+            tokens 
+        };
         
         return NextResponse.json(walletDetails);
 
     } catch (error: any) {
         console.error(`[API WALLET DETAILS] Failed to fetch for ${address}:`, error);
         if (error.message && error.message.includes('could not find account')) {
-             const walletDetails: WalletDetails = { address, balance: 0, balanceUSD: 0, tokens: [] };
+             const walletDetails: WalletDetails = { 
+                address, 
+                sol: { balance: 0, price: 0, valueUSD: 0 }, 
+                tokens: [] 
+            };
              return NextResponse.json(walletDetails);
         }
         return NextResponse.json({ message: `Failed to fetch wallet details: ${error.message}` }, { status: 500 });

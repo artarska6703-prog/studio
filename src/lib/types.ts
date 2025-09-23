@@ -34,8 +34,11 @@ export type Transaction = EnrichedTransaction & {
 
 export interface WalletDetails {
   address: string;
-  balance: number;
-  balanceUSD: number | null;
+  sol: {
+    balance: number;
+    price: number;
+    valueUSD: number;
+  };
   tokens: TokenHolding[];
 }
 

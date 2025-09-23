@@ -204,7 +204,7 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
 
                 <div className="p-4 space-y-4 overflow-y-auto flex-1">
                     <div className="space-y-2">
-                        <StatItem label="Balance" isLoading={isLoading} value={details ? `${details.balance.toFixed(4)} SOL (${formatCurrency(details.balanceUSD || 0)})` : ''} />
+                        <StatItem label="Balance" isLoading={isLoading} value={details ? `${details.sol.balance.toFixed(4)} SOL (${formatCurrency(details.sol.valueUSD || 0)})` : ''} />
                         <Accordion type="single" collapsible>
                             <AccordionItem value="tokens" className="border-none">
                                 <AccordionTrigger className="flex justify-between items-center text-sm py-1 font-medium text-muted-foreground hover:no-underline">
@@ -275,5 +275,3 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         </Sheet>
     );
 }
-
-    

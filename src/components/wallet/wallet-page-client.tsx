@@ -197,14 +197,14 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
 
   const displayedDetails = useMemo(() => {
     if (useMockData) {
-      return { address: address, balance: 1234.56, balanceUSD: 1234.56 * 150, tokens: [] };
+      return { address: address, sol: { balance: 1234.56, price: 150, valueUSD: 1234.56 * 150 }, tokens: [] };
     }
     return walletDetails;
   }, [useMockData, walletDetails, address]);
   
   const solPrice = useMemo(() => {
-    if (!displayedDetails || !displayedDetails.balance || !displayedDetails.balanceUSD) return null;
-    return displayedDetails.balanceUSD / displayedDetails.balance;
+    if (!displayedDetails) return null;
+    return displayedDetails.sol.price;
   }, [displayedDetails]);
 
   if (isLoading && !useMockData) {
@@ -257,8 +257,8 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                  <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                     {displayedDetails && (
                         <BalanceCard
-                            balance={displayedDetails.balance}
-                            balanceUSD={displayedDetails.balanceUSD}
+                            balance={displayedDetails.sol.balance}
+                            balanceUSD={displayedDetails.sol.valueUSD}
                             className="lg:col-span-1"
                         />
                     )}
@@ -346,5 +346,3 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     </div>
   );
 }
-
-    

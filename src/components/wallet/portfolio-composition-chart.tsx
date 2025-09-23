@@ -55,8 +55,8 @@ export function PortfolioCompositionChart({ walletDetails }: PortfolioCompositio
         if (!walletDetails) return [];
 
         const data = [];
-        if (walletDetails.balanceUSD && walletDetails.balanceUSD > 0) {
-            data.push({ name: 'SOL', value: walletDetails.balanceUSD });
+        if (walletDetails.sol.valueUSD && walletDetails.sol.valueUSD > 0) {
+            data.push({ name: 'SOL', value: walletDetails.sol.valueUSD });
         }
 
         walletDetails.tokens.forEach(token => {
