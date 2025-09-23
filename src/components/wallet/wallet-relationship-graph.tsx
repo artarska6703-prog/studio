@@ -3,6 +3,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { DataSet, Network, Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,9 +11,8 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Transaction } from '@/lib/types';
-import { WalletDetailSheet } from './wallet-detail-sheet';
 import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
-import { processTransactions, groupStyles } from './wallet-relationship-graph-utils';
+import { processTransactions, groupStyles, PhysicsState } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
 
@@ -58,6 +58,7 @@ const GraphLegend = () => {
 export interface DiagnosticData {
     nodes: GraphNode[];
     links: GraphLink[];
+    physics: PhysicsState;
 }
 interface WalletNetworkGraphProps {
     walletAddress: string;
@@ -69,14 +70,23 @@ const ALL_NODE_TYPES = legendItems.map(item => item.key);
 
 export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [selectedNode, setSelectedNode] = useState<string | null>(null);
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
-
-    const [maxDepth, setMaxDepth] = useState(5);
+    const router = useRouter();
+    
+    const [maxDepth, setMaxDepth] = useState(3);
     const [minVolume, setMinVolume] = useState(0);
     const debouncedMinVolume = useDebounce(minVolume, 500);
     const [minTransactions, setMinTransactions] = useState(1);
     const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(ALL_NODE_TYPES);
+
+    const [physicsState, setPhysicsState] = useState<PhysicsState>({
+        solver: "barnesHut",
+        gravitationalConstant: -8000,
+        centralGravity: 0.1,
+        springLength: 120,
+        springConstant: 0.08,
+        damping: 0.09,
+        avoidOverlap: 0.7,
+    });
 
     const handleNodeTypeToggle = (nodeType: string, checked: boolean) => {
         setVisibleNodeTypes(prev => 
@@ -104,8 +114,8 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
     }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes]);
     
     useEffect(() => {
-        onDiagnosticDataUpdate?.({ nodes, links });
-    }, [nodes, links, onDiagnosticDataUpdate]);
+        onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });
+    }, [nodes, links, physicsState, onDiagnosticDataUpdate]);
     
     useEffect(() => {
         if (!containerRef.current) return;
@@ -121,13 +131,14 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             width: '100%',
             physics: {
                 barnesHut: {
-                    gravitationalConstant: -8000,
-                    centralGravity: 0.1,
-                    springLength: 120,
-                    springConstant: 0.08,
-                    damping: 0.09,
-                    avoidOverlap: 0.7,
+                    gravitationalConstant: physicsState.gravitationalConstant,
+                    centralGravity: physicsState.centralGravity,
+                    springLength: physicsState.springLength,
+                    springConstant: physicsState.springConstant,
+                    damping: physicsState.damping,
+                    avoidOverlap: physicsState.avoidOverlap,
                 },
+                solver: physicsState.solver as any,
                 stabilization: {
                   enabled: true,
                   iterations: 1000,
@@ -197,11 +208,11 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
 
         networkInstance.on('click', (params) => {
             if (params.nodes.length > 0) {
-                const nodeId = params.nodes[0];
+                const nodeId = params.nodes[0] as string;
                 const clickedNode = nodes.find(n => n.id === nodeId);
-                if (clickedNode && !clickedNode.fixed) {
-                    setSelectedNode(nodeId);
-                    setIsSheetOpen(true);
+                // Only navigate if it's not the currently viewed wallet (the root node)
+                if (clickedNode && clickedNode.type !== 'root') {
+                    router.push(`/wallet/${nodeId}`);
                 }
             }
         });
@@ -222,16 +233,9 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             networkInstance.destroy();
         };
 
-    }, [nodes, links]);
-    
-    useEffect(() => {
-        if (!isSheetOpen) {
-            setSelectedNode(null);
-        }
-    }, [isSheetOpen]);
+    }, [nodes, links, physicsState, router]);
 
     return (
-        <>
         <Card className="bg-transparent border-0 shadow-none">
             <CardContent className="grid grid-cols-1 md:grid-cols-12 gap-0 p-0">
                 <div className="md:col-span-3 lg:col-span-3 bg-background p-6 rounded-l-lg overflow-y-auto max-h-[800px]">
@@ -249,7 +253,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
                                 </div>
                                 <div>
                                     <Label className="text-sm">Max Depth: {maxDepth}</Label>
-                                    <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={5} step={1} />
+                                    <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={3} step={1} />
                                 </div>
                             </div>
                         </div>
@@ -279,15 +283,5 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
                 </div>
             </CardContent>
         </Card>
-        {selectedNode && (
-            <WalletDetailSheet
-                address={selectedNode}
-                open={isSheetOpen}
-                onOpenChange={setIsSheetOpen}
-            />
-        )}
-        </>
     );
 }
-
-    
