@@ -3,6 +3,43 @@ import { Helius } from "helius-sdk";
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
 
+interface JupiterToken {
+    address: string; // Mint address
+    symbol: string;
+    name: string;
+    decimals: number;
+}
+
+let tokenMap: Map<string, JupiterToken> | null = null;
+
+async function getJupiterTokenMap(): Promise<Map<string, JupiterToken>> {
+    if (tokenMap) {
+        return tokenMap;
+    }
+
+    try {
+        const response = await fetch('https://token.jup.ag/all');
+        if (!response.ok) {
+            console.error('[Price Utils] Failed to fetch Jupiter token list');
+            return new Map();
+        }
+        const tokenList: JupiterToken[] = await response.json();
+        
+        const newMap = new Map<string, JupiterToken>();
+        tokenList.forEach(token => {
+            newMap.set(token.address, token);
+        });
+
+        tokenMap = newMap;
+        return tokenMap;
+
+    } catch (error) {
+        console.error('[Price Utils] Error fetching or processing Jupiter token list:', error);
+        return new Map();
+    }
+}
+
+
 /**
  * Fetches prices for a list of token mints using the Jupiter Price API.
  * @param mints An array of token mint addresses.
@@ -12,24 +49,31 @@ export const getTokenPrices = async (mints: string[]): Promise<{ [mint: string]:
     if (mints.length === 0) return {};
     
     const prices: { [mint: string]: number } = {};
-    const mintsToFetch = new Set(mints);
+    const mintsToFetch = Array.from(new Set(mints)); // Remove duplicates
 
-    if (mintsToFetch.size > 0) {
+    const jupiterTokenMap = await getJupiterTokenMap();
+    
+    const symbolsToFetch = mintsToFetch
+        .map(mint => jupiterTokenMap.get(mint)?.symbol)
+        .filter((symbol): symbol is string => !!symbol);
+
+    if (symbolsToFetch.length > 0) {
         try {
-            const url = `https://price.jup.ag/v6/price?ids=${Array.from(mintsToFetch).join(',')}`;
+            const url = `https://price.jup.ag/v6/price?ids=${symbolsToFetch.join(',')}`;
             const response = await fetch(url);
             
             if (!response.ok) {
                 console.error(`[Price Utils] Jupiter API request failed with status: ${response.status}`);
-                return prices; // Return what we have, which is empty in this case
+                return prices;
             }
 
             const data = await response.json();
             
             if (data.data) {
-                for (const mint in data.data) {
-                    if (data.data[mint]) {
-                        prices[mint] = data.data[mint].price;
+                 for (const mint of mintsToFetch) {
+                    const symbol = jupiterTokenMap.get(mint)?.symbol;
+                    if (symbol && data.data[symbol]) {
+                        prices[mint] = data.data[symbol].price;
                     }
                 }
             }
@@ -56,4 +100,3 @@ export const getSolanaPrice = async (): Promise<number | null> => {
         return null;
     }
 };
-
