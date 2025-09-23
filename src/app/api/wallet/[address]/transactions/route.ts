@@ -32,7 +32,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     
                     const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
                     const price = prices[mint];
-                    const valueUSD = price ? (Math.abs(amountRaw) * price) : null;
+                    const valueUSD = price && amountRaw > 0 ? (amountRaw * price) : null;
                     
                     flattenedTxs.push({
                         ...tx,
