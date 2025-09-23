@@ -113,12 +113,6 @@ export async function GET(
     
     const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
 
-    // Add debugging here:
-    console.log('First transaction sample:');
-    console.log('Available fields:', Object.keys(parsedTxs[0] || {}));
-    console.log('blockTime value:', parsedTxs[0]?.blockTime);
-    console.log('timestamp value:', parsedTxs[0]?.timestamp);
-
     // Ensure parsedTxs is an array before processing
     const processedTxs = processHeliusTransactions(parsedTxs || [], params.address);
     
