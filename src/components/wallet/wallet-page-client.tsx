@@ -1,4 +1,3 @@
-
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -113,14 +112,14 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     if (useMockData) {
       // Create some mock details for the graph to use
       const MOCK_SOL_PRICE = 150;
-      return { address: address, balance: 1234.56, balanceUSD: 1234.56 * MOCK_SOL_PRICE, tokens: [] };
+      return { address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [] };
     }
     return walletDetails;
   }, [useMockData, walletDetails, address]);
   
   const solPrice = useMemo(() => {
     if (!displayedDetails) return null;
-    return displayedDetails.balanceUSD && displayedDetails.balance ? displayedDetails.balanceUSD / displayedDetails.balance : null;
+    return displayedDetails.sol.price;
   }, [displayedDetails]);
 
   const liveTransactions = useMemo(() => {
@@ -201,8 +200,8 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                     {displayedDetails ? (
                         <>
                           <BalanceCard
-                              balance={displayedDetails.balance}
-                              balanceUSD={displayedDetails.balanceUSD}
+                              balance={displayedDetails.sol.balance}
+                              balanceUSD={displayedDetails.sol.valueUSD}
                           />
                           <TokenTable tokens={displayedDetails.tokens} className="md:col-span-2" />
                         </>
@@ -213,7 +212,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                         </>
                     ) : <p>No details to display.</p>}
                 </div>
-                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.balanceUSD} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
+                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.sol.valueUSD} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
                  <TransactionTable 

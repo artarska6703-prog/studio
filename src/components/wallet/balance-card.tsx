@@ -1,10 +1,9 @@
-
 // src/components/wallet/balance-card.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface BalanceCardProps {
   balance: number;
-  balanceUSD: number | null;
+  balanceUSD: number;
 }
 
 export function BalanceCard({ balance, balanceUSD }: BalanceCardProps) {

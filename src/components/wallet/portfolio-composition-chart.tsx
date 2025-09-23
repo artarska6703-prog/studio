@@ -1,15 +1,14 @@
-
 // src/components/wallet/portfolio-composition-chart.tsx
 import type { TokenHolding } from "@/lib/types";
 
 interface PortfolioCompositionChartProps {
-  solValue: number | null;
+  solValue: number;
   tokens: TokenHolding[];
 }
 
 export function PortfolioCompositionChart({ solValue, tokens }: PortfolioCompositionChartProps) {
   const data = [
-    { name: "SOL", value: solValue ?? 0 },
+    { name: "SOL", value: solValue },
     ...tokens.map((t) => ({ name: t.symbol, value: t.valueUSD })),
   ].filter((d) => d.value > 0);
 

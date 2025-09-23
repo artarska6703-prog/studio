@@ -1,4 +1,3 @@
-
 // src/components/wallet/token-table.tsx
 import type { TokenHolding } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

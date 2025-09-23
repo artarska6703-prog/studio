@@ -1,4 +1,3 @@
-
 // src/app/api/wallet/[address]/transactions/route.ts
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius } from "helius-sdk";
@@ -67,6 +66,7 @@ function processHeliusTransactions(
           from: t.fromUserAccount,
           to: t.toUserAccount,
           by: tx.feePayer,
+          instruction: tx.type,
           interactedWith: Array.from(
             new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean))
           ).filter((a) => a !== walletAddress),
@@ -87,10 +87,13 @@ function processHeliusTransactions(
         symbol: null,
         mint: null,
         from: tx.feePayer,
-        to: tx.instructions?.[0]?.programId,
+        to: tx.instructions?.[0]?.programId || null,
         by: tx.feePayer,
-        interactedWith: tx.instructions?.map((i) => i.programId),
-        valueUSD: 0,
+        instruction: tx.type,
+        interactedWith: Array.from(
+          new Set(tx.instructions?.map((i: any) => i.programId).filter(Boolean))
+        ),
+        valueUSD: 0, // never null
       });
     }
   }
@@ -107,63 +110,46 @@ export async function GET(
   if (!SYNDICA_RPC_URL) {
     return NextResponse.json({ error: "SYNDICA_RPC_URL missing" }, { status: 500 });
   }
-  const { address } = params;
-  if (!address) {
-    return NextResponse.json({ error: "No address param" }, { status: 400 });
-  }
+  const address = params?.address;
+  if (!address) return NextResponse.json({ error: "No address param" }, { status: 400 });
 
   try {
-    const helius = new Helius(HELIUS_API_KEY!);
+    const helius = new Helius(HELIUS_API_KEY);
     const connection = new Connection(SYNDICA_RPC_URL, "confirmed");
     const pubkey = new PublicKey(address);
 
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "100", 10);
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
     const before = searchParams.get("before") || undefined;
-    
+
     const [signatures, tokenList] = await Promise.all([
       connection.getSignaturesForAddress(pubkey, { limit, before }),
       loadTokenMap(),
     ]);
 
-    if (!signatures || signatures.length === 0) {
-      return NextResponse.json({ transactions: [], addressBalances: {}, nextCursor: null });
+    if (!Array.isArray(signatures) || signatures.length === 0) {
+      return NextResponse.json({ transactions: [], nextCursor: null, addressBalances: {} });
     }
 
     const sigs = signatures.map((s) => s.signature);
-    const parsedTxs = await helius.rpc.parseTransactions({transactions: sigs});
+    const parsed = await helius.rpc.parseTransactions({ transactions: sigs });
+    const txs: Transaction[] = Array.isArray(parsed) ? parsed : [];
 
-    const txs: Transaction[] = Array.isArray(parsedTxs) ? parsedTxs : [];
-
-    const mints = new Set<string>();
-    mints.add("So11111111111111111111111111111111111111112"); // SOL
+    // gather mints for pricing
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    const mints = new Set<string>([SOL_MINT]);
     for (const tx of txs) {
-      for (const t of tx.tokenTransfers ?? []) {
-        if(t.mint) mints.add(t.mint);
-      }
+      for (const t of tx.tokenTransfers ?? []) if (t.mint) mints.add(t.mint);
     }
     const prices = await getTokenPrices(Array.from(mints));
 
     const processed = processHeliusTransactions(txs, address, prices, tokenList);
 
-    const addrSet = new Set<string>();
-    for (const t of processed) {
-      if (t.from) addrSet.add(t.from);
-      if (t.to) addrSet.add(t.to);
-    }
-    const addrArr = Array.from(addrSet);
-    const infos = await connection.getMultipleAccountsInfo(addrArr.map(a => new PublicKey(a)));
-    
-    const addressBalances: Record<string, number> = {};
-    infos.forEach((acc, i) => {
-        addressBalances[addrArr[i]] = acc ? acc.lamports / LAMPORTS_PER_SOL : 0;
-    });
-    
     const nextCursor = signatures.length === limit ? signatures[signatures.length - 1].signature : null;
 
-    return NextResponse.json({ transactions: processed, addressBalances, nextCursor });
+    return NextResponse.json({ transactions: processed, nextCursor });
   } catch (err: any) {
     console.error("[transactions] error:", err);
-    return NextResponse.json({ error: err.message || "Unknown" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "Unknown" }, { status: 500 });
   }
 }

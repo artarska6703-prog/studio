@@ -1,10 +1,10 @@
-
 // src/app/api/wallet/[address]/details/route.ts
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import { getTokenPrices } from "@/lib/price-utils";
-import type { WalletDetails, TokenHolding } from "@/lib/types";
+import { loadTokenMap } from "@/lib/token-list";
+import type { WalletDetails } from "@/lib/types";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
@@ -13,46 +13,67 @@ export async function GET(
   req: Request,
   { params }: { params: { address: string } }
 ) {
+  if (!HELIUS_API_KEY) {
+    return NextResponse.json({ error: "HELIUS_API_KEY missing" }, { status: 500 });
+  }
+  if (!SYNDICA_RPC_URL) {
+    return NextResponse.json({ error: "SYNDICA_RPC_URL missing" }, { status: 500 });
+  }
   const { address } = params || {};
   if (!address) {
     return NextResponse.json({ error: "No address param" }, { status: 400 });
   }
 
   try {
-    const helius = new Helius(HELIUS_API_KEY!);
-    const connection = new Connection(SYNDICA_RPC_URL!, "confirmed");
+    const helius = new Helius(HELIUS_API_KEY);
+    const connection = new Connection(SYNDICA_RPC_URL, "confirmed");
     const pubkey = new PublicKey(address);
 
+    // 1) Fetch assets owned by wallet
     const assets = await helius.rpc.getAssetsByOwner({
       ownerAddress: pubkey.toBase58(),
     });
 
-    const tokenMints = [
-      "So11111111111111111111111111111111111111112"
-    ];
+    // 2) Build set of mints (include SOL mint always)
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    const tokenMints = new Set<string>([SOL_MINT]);
 
-    const tokenPrices = await getTokenPrices(tokenMints);
+    for (const it of assets?.items ?? []) {
+      if (it.interface === "FungibleToken" && it.id) {
+        tokenMints.add(it.id);
+      }
+    }
 
-    const tokens: TokenHolding[] = (assets.items || [])
-      .filter((asset: any) => asset.interface === 'FungibleToken' && asset.content?.metadata)
-      .filter((asset: any) => asset.price_info)
-      .map((asset: any) => ({
-        mint: asset.id,
-        symbol: asset.content.metadata.symbol,
-        amount: asset.token_info.balance / (10 ** asset.token_info.decimals),
-        price: asset.price_info.price_per_token,
-        valueUSD: asset.price_info.total_price,
-      }));
+    // 3) Fetch prices + token symbols
+    const [prices, tokenMap] = await Promise.all([
+      getTokenPrices(Array.from(tokenMints)),
+      loadTokenMap(),
+    ]);
 
+    // 4) Compose tokens list
+    const tokens = (assets?.items ?? [])
+      .filter((a: any) => a.interface === "FungibleToken")
+      .map((a: any) => {
+        const mint = a.id as string;
+        const symbol = tokenMap.get(mint) || mint.slice(0, 4);
+        const amount =
+          a.token_info?.balance ??
+          a.token_info?.amount ??
+          0;
+        const price = prices[mint] ?? 0;
+        const valueUSD = amount * price;
+        return { mint, symbol, amount, price, valueUSD };
+      });
+
+    // 5) SOL balance/value
     const lamports = await connection.getBalance(pubkey);
-    const balance = lamports / LAMPORTS_PER_SOL;
-    const solPrice = tokenPrices["So11111111111111111111111111111111111111112"];
-    const balanceUSD = solPrice ? balance * solPrice : null;
+    const solBalance = lamports / LAMPORTS_PER_SOL;
+    const solPrice = prices[SOL_MINT] ?? 0;
+    const solValueUSD = solBalance * solPrice;
 
     const response: WalletDetails = {
       address,
-      balance,
-      balanceUSD,
+      sol: { balance: solBalance, price: solPrice, valueUSD: solValueUSD },
       tokens,
     };
 
@@ -60,9 +81,13 @@ export async function GET(
   } catch (err: any) {
     console.error("[details] error:", err);
     if (err.message && err.message.includes('could not find account')) {
-         const walletDetails: WalletDetails = { address, balance: 0, balanceUSD: 0, tokens: [] };
-         return NextResponse.json(walletDetails);
+        const walletDetails: WalletDetails = { 
+          address, 
+          sol: { balance: 0, price: 0, valueUSD: 0 }, 
+          tokens: [] 
+        };
+        return NextResponse.json(walletDetails);
     }
-    return NextResponse.json({ error: `Failed to fetch wallet details: ${err.message}` }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "Unknown" }, { status: 500 });
   }
 }
