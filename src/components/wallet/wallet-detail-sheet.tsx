@@ -106,10 +106,12 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                     ]);
                     
                     if (!detailsRes.ok) {
-                        throw new Error(`Failed to fetch wallet details. Status: ${detailsRes.status}`);
+                        const errorData = await detailsRes.json();
+                        throw new Error(errorData.message || `Failed to fetch wallet details. Status: ${detailsRes.status}`);
                     }
                     if (!txRes.ok) {
-                         throw new Error(`Failed to fetch wallet transactions. Status: ${txRes.status}`);
+                        const errorData = await txRes.json();
+                        throw new Error(errorData.message || `Failed to fetch wallet transactions. Status: ${txRes.status}`);
                     }
 
                     const detailsData = await detailsRes.json();
@@ -273,3 +275,5 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         </Sheet>
     );
 }
+
+    
