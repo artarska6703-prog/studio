@@ -74,6 +74,27 @@ const getNodeSize = (balance: number) => {
     return baseSize;
 }
 
+const createTooltipElement = (data: { [key: string]: string | number | undefined }) => {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'p-2 bg-card text-card-foreground rounded-lg border border-border shadow-lg max-w-xs';
+    
+    let content = '';
+    for (const [key, value] of Object.entries(data)) {
+        if(value !== undefined) {
+             content += `
+                <div class="flex justify-between items-center text-xs py-1">
+                    <span class="capitalize text-muted-foreground">${key.replace(/([A-Z])/g, ' $1')}:</span>
+                    <span class="font-medium font-code text-right">${value}</span>
+                </div>
+            `;
+        }
+    }
+
+    tooltip.innerHTML = content;
+    return tooltip;
+};
+
+
 export const processTransactions = (transactions: (Transaction | FlattenedTransaction)[], rootAddress: string, maxDepth: number, addressBalances: { [key: string]: number }): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
@@ -170,6 +191,15 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 fixed = true;
             }
 
+            const tooltipData = {
+                address: address,
+                balance: `${balance.toFixed(2)} SOL`,
+                interactionVolume: formatCurrency(interactionVolume),
+                transactions: txCount,
+                type: nodeType,
+                hops: nodeDepths.get(address) ?? 'N/A'
+            };
+
             return {
                 id: address,
                 label: label,
@@ -184,7 +214,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
-                title: `Address: ${address}<br>Balance: ${balance.toFixed(2)} SOL<br>Interaction Volume: ${formatCurrency(interactionVolume)}<br>Transactions: ${txCount}<br>Type: ${nodeType}<br>Hops: ${nodeDepths.get(address) ?? 'N/A'}`,
+                title: createTooltipElement(tooltipData)
             };
         });
 
