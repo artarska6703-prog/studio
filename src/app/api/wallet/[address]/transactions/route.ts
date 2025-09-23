@@ -3,8 +3,10 @@ import { Helius, TransactionType, type EnrichedTransaction } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction } from "@/lib/types";
 import { unstable_cache } from "next/cache";
+import { Connection, PublicKey } from "@solana/web3.js";
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
+const rpcEndpoint = process.env.SYNDICA_RPC_URL;
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
 const getTokenPrices = unstable_cache(
@@ -13,6 +15,8 @@ const getTokenPrices = unstable_cache(
         try {
             const helius = new Helius(heliusApiKey);
             const prices: { [mint: string]: number } = {};
+            // Helius getAssetBatch is better but not available in all SDK versions easily.
+            // Let's do it one by one and cache it.
             const pricePromises = mints.map(async (mint) => {
                 try {
                     const asset = await helius.rpc.getAsset(mint);
@@ -68,6 +72,7 @@ const processHeliusTransactions = (
     if (!transactions || transactions.length === 0) return flattenedTxs;
 
     transactions.forEach(tx => {
+        if (!tx) return;
         let hasRelevantTransfer = false;
         
         const processTransfers = (transfers: any[] | undefined | null, isNative: boolean) => {
@@ -135,8 +140,8 @@ export async function GET(
   req: Request,
   { params }: { params?: { address?: string } }
 ) {
-  if (!heliusApiKey) {
-    return NextResponse.json({ error: "Server configuration error: Helius API key is missing." }, { status: 500 });
+  if (!heliusApiKey || !rpcEndpoint) {
+    return NextResponse.json({ error: "Server configuration error: API keys or RPC URL is missing." }, { status: 500 });
   }
 
   try {
@@ -145,20 +150,24 @@ export async function GET(
     }
     
     const helius = new Helius(heliusApiKey);
-    
+    const connection = new Connection(rpcEndpoint, 'confirmed');
+
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
 
-    // This was the source of the bug. getTransactions is the correct method.
-    const transactions = await helius.getTransactions({
-      address: params.address,
-      options: { limit: 50, before },
-    });
-    
-    if (!transactions || transactions.length === 0) {
+    const signatures = await connection.getSignaturesForAddress(
+        new PublicKey(params.address), 
+        { limit: 50, before }
+    );
+
+    if (!signatures || signatures.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null });
     }
     
+    const transactions = await helius.parser.parseTransaction({
+        transactions: signatures.map(s => s.signature),
+    });
+
     const allTokenMints = transactions
       .flatMap(tx => tx.tokenTransfers?.map(t => t.mint) || [])
       .filter((mint): mint is string => !!mint);
@@ -171,7 +180,7 @@ export async function GET(
     
     const processedTxs = processHeliusTransactions(transactions, params.address, solPrice, tokenPrices);
     
-    const nextCursor = transactions.length > 0 ? transactions[transactions.length - 1]?.signature : null;
+    const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
 
     return NextResponse.json({
       transactions: processedTxs,
