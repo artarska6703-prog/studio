@@ -29,15 +29,40 @@ const getTokenPrices = async (mints: string[]) => {
 };
 
 
-const getSolanaPrice = async () => {
-    if (!HELIUS_API_KEY) return null;
+const getSolanaPrice = async (): Promise<number> => {
+    if (!HELIUS_API_KEY) return 150; // Fallback if no API key
     try {
+        // First, try Helius
         const helius = new Helius(HELIUS_API_KEY);
         const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
-        return asset?.token_info?.price_info?.price_per_token ?? null;
+        const heliusPrice = asset?.token_info?.price_info?.price_per_token;
+
+        if (heliusPrice) {
+            return heliusPrice;
+        }
+
+        // Fallback to Jupiter if Helius fails
+        const jupiterResponse = await fetch('https://price.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
+        if (jupiterResponse.ok) {
+            const jupiterData = await jupiterResponse.json();
+            const jupiterPrice = jupiterData.data['So11111111111111111111111111111111111111112']?.price;
+            if (jupiterPrice) return jupiterPrice;
+        }
+        
+        return 150; // Final fallback
     } catch (error) {
-        console.error("Failed to fetch SOL price:", error);
-        return null;
+        console.error("Failed to fetch SOL price, falling back to Jupiter or default", error);
+         try {
+            const jupiterResponse = await fetch('https://price.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
+            if (jupiterResponse.ok) {
+                const jupiterData = await jupiterResponse.json();
+                const jupiterPrice = jupiterData.data['So11111111111111111111111111111111111111112']?.price;
+                if (jupiterPrice) return jupiterPrice;
+            }
+        } catch (e) {
+             console.error("Fallback to Jupiter also failed", e);
+        }
+        return 150; // Final fallback
     }
 };
 

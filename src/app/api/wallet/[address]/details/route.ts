@@ -13,8 +13,6 @@ const getTokenPrices = async (mints: string[]) => {
     const helius = new Helius(heliusApiKey);
     const prices: { [mint: string]: number } = {};
     
-    // Helius free tier has a rate limit, so we'll batch the requests.
-    // However, getAssetBatch doesn't return price info, so we have to do it one by one for now.
     const pricePromises = mints.map(mint => 
         helius.rpc.getAsset(mint).then(asset => ({ mint, price: asset?.token_info?.price_info?.price_per_token }))
     );
@@ -30,10 +28,43 @@ const getTokenPrices = async (mints: string[]) => {
     return prices;
 };
 
-const getSolanaPrice = async () => {
-    // Temporary hardcoding to fix UI display issues.
-    return 150;
+const getSolanaPrice = async (): Promise<number> => {
+    if (!heliusApiKey) return 150; // Fallback if no API key
+    try {
+        // First, try Helius
+        const helius = new Helius(heliusApiKey);
+        const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
+        const heliusPrice = asset?.token_info?.price_info?.price_per_token;
+
+        if (heliusPrice) {
+            return heliusPrice;
+        }
+
+        // Fallback to Jupiter if Helius fails
+        const jupiterResponse = await fetch('https://price.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
+        if (jupiterResponse.ok) {
+            const jupiterData = await jupiterResponse.json();
+            const jupiterPrice = jupiterData.data['So11111111111111111111111111111111111111112']?.price;
+            if (jupiterPrice) return jupiterPrice;
+        }
+        
+        return 150; // Final fallback
+    } catch (error) {
+        console.error("Failed to fetch SOL price, falling back to Jupiter or default", error);
+         try {
+            const jupiterResponse = await fetch('https://price.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
+            if (jupiterResponse.ok) {
+                const jupiterData = await jupiterResponse.json();
+                const jupiterPrice = jupiterData.data['So11111111111111111111111111111111111111112']?.price;
+                if (jupiterPrice) return jupiterPrice;
+            }
+        } catch (e) {
+             console.error("Fallback to Jupiter also failed", e);
+        }
+        return 150; // Final fallback
+    }
 };
+
 
 export async function GET(
     request: NextRequest,
