@@ -1,3 +1,4 @@
+
 import type { EnrichedTransaction, TokenStandard, TransactionType } from "helius-sdk";
 
 export interface TokenHolding {
@@ -28,6 +29,7 @@ export type FlattenedTransaction = Omit<EnrichedTransaction, 'type'> & {
 
 export type Transaction = EnrichedTransaction & {
   blockTime?: number;
+  timestamp?: number;
 };
 
 export interface WalletDetails {
