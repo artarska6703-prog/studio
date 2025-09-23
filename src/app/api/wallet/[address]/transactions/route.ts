@@ -1,14 +1,55 @@
 
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Helius, TransactionType } from "helius-sdk";
+import { Helius, TransactionType, type EnrichedTransaction } from "helius-sdk";
 import { NextResponse } from "next/server";
-import type { FlattenedTransaction, Transaction } from "@/lib/types";
-
+import type { FlattenedTransaction, TokenHolding } from "@/lib/types";
+import { unstable_cache } from "next/cache";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, solPrice: number | null, tokenPrices: Record<string, number>): FlattenedTransaction[] => {
+const getTokenPrices = unstable_cache(
+    async (mints: string[]) => {
+        if (mints.length === 0) return {};
+        try {
+            const response = await fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mints.join(',')}&vs_currencies=usd`);
+            if (!response.ok) return {};
+            const data = await response.json();
+            const prices: { [mint: string]: number } = {};
+            for (const mint of mints) {
+                if (data[mint] && data[mint].usd) prices[mint] = data[mint].usd;
+            }
+            return prices;
+        } catch (error) {
+            return {};
+        }
+    },
+    ['token-prices'],
+    { revalidate: 60 * 5 }
+);
+
+const getSolanaPrice = unstable_cache(
+    async () => {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+            if (!response.ok) return null;
+            const data = await response.json();
+            return data.solana.usd as number;
+        } catch (error) {
+            return null;
+        }
+    },
+    ['solana-price'],
+    { revalidate: 60 }
+);
+
+
+const processHeliusTransactions = (
+    transactions: EnrichedTransaction[], 
+    walletAddress: string, 
+    solPrice: number | null, 
+    tokenPrices: Record<string, number>
+): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
 
@@ -20,7 +61,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
             transfers.forEach(transfer => {
                 const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress || transfer.owner === walletAddress;
                 
-                if (isOwnerInvolved && transfer.amount > 0) {
+                if (isOwnerInvolved && (isNative ? transfer.amount > 0 : transfer.tokenAmount > 0)) {
                     hasRelevantTransfer = true;
                     
                     const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.tokenAmount;
@@ -28,18 +69,19 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     const finalAmount = sign * amountRaw;
 
                     let valueUSD: number | null = null;
-                    if (isNative && solPrice) {
-                        valueUSD = amountRaw * solPrice;
-                    } else if (!isNative && tokenPrices[transfer.mint]) {
-                        valueUSD = amountRaw * tokenPrices[transfer.mint];
+                    const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
+                    const price = isNative ? solPrice : tokenPrices[mint];
+
+                    if (price) {
+                        valueUSD = amountRaw * price;
                     }
 
                     flattenedTxs.push({
                         ...tx,
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
-                        symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
-                        mint: isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint,
+                        symbol: isNative ? 'SOL' : null, 
+                        mint: mint,
                         from: transfer.fromUserAccount,
                         to: transfer.toUserAccount,
                         by: tx.feePayer,
@@ -62,46 +104,16 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                 symbol: null,
                 mint: null,
                 from: tx.feePayer,
-                to: tx.instructions?.[0]?.programId || null,
+                to: tx.accountData?.[0]?.programId || null,
                 by: tx.feePayer,
                 instruction: tx.type,
-                interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
+                interactedWith: Array.from(new Set(tx.accountData?.map(i => i.programId).filter(Boolean) as string[])),
                 valueUSD: null,
             });
         }
     });
 
     return flattenedTxs;
-}
-
-const getPrices = async (mints: string[]): Promise<{ solPrice: number | null, tokenPrices: Record<string, number> }> => {
-    try {
-        const uniqueMints = Array.from(new Set(mints.filter(m => m !== 'So11111111111111111111111111111111111111112')));
-
-        const [solPriceRes, tokenPriceRes] = await Promise.all([
-             fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd'),
-             uniqueMints.length > 0 ? fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${uniqueMints.join(',')}&vs_currencies=usd`) : Promise.resolve(null)
-        ]);
-
-        const solData = await solPriceRes.json();
-        const solPrice = solData?.solana?.usd || null;
-
-        let tokenPrices: Record<string, number> = {};
-        if(tokenPriceRes && tokenPriceRes.ok) {
-            const tokenData = await tokenPriceRes.json();
-            for (const mint in tokenData) {
-                if (tokenData[mint].usd) {
-                    tokenPrices[mint] = tokenData[mint].usd;
-                }
-            }
-        }
-        
-        return { solPrice, tokenPrices };
-
-    } catch (e) {
-        console.error("Failed to fetch prices from coingecko", e);
-        return { solPrice: null, tokenPrices: {} };
-    }
 }
 
 
@@ -112,56 +124,50 @@ export async function GET(
   if (!HELIUS_API_KEY) {
     return NextResponse.json({ error: "Server configuration error: Helius API key is missing." }, { status: 500 });
   }
-  if (!SYNDICA_RPC_URL) {
-    return NextResponse.json({ error: "Server configuration error: RPC URL is missing." }, { status: 500 });
-  }
 
   try {
     if (!params?.address) {
-      return NextResponse.json(
-        { error: "No address provided in route params" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No address provided" }, { status: 400 });
     }
     
-    const helius = new Helius(HELIUS_API_KEY!);
-    const connection = new Connection(SYNDICA_RPC_URL!, "confirmed");
+    const helius = new Helius(HELIUS_API_KEY);
     
-    const pubkey = new PublicKey(params.address);
-
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "50", 10);
     const before = searchParams.get("before") || undefined;
 
-    const signatures = await connection.getSignaturesForAddress(pubkey, {
-      limit,
-      before
+    const transactions = await helius.rpc.getTransactions({
+      address: params.address,
+      options: { limit: 50, before },
     });
     
-    if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {
+    if (!transactions || transactions.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null });
     }
     
-    const signatureStrings = signatures.map(s => s.signature);
-    
-    const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
+    const allTokenMints = transactions
+      .flatMap(tx => tx.tokenTransfers?.map(t => t.mint) || [])
+      .filter((mint): mint is string => !!mint);
+    const uniqueTokenMints = Array.from(new Set(allTokenMints));
 
-    const allMints = parsedTxs.flatMap(tx => tx.tokenTransfers?.map(t => t.mint) || []).filter(Boolean) as string[];
-    const { solPrice, tokenPrices } = await getPrices(allMints);
+    const [solPrice, tokenPrices] = await Promise.all([
+      getSolanaPrice(),
+      getTokenPrices(uniqueTokenMints)
+    ]);
     
-    const processedTxs = processHeliusTransactions(parsedTxs || [], params.address, solPrice, tokenPrices);
+    const processedTxs = processHeliusTransactions(transactions, params.address, solPrice, tokenPrices);
     
-    const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
+    const nextCursor = transactions.length > 0 ? transactions[transactions.length - 1]?.signature : null;
 
     return NextResponse.json({
       transactions: processedTxs,
       nextCursor,
     });
   } catch (err: any) {
-    console.error("Error fetching wallet transactions:", err);
-    return NextResponse.json(
-      { error: err?.message || "Unknown error", stack: String(err) },
-      { status: 500 }
-    );
+    console.error("[API TRANSACTIONS] Error fetching transactions:", err);
+    const errorMessage = err?.message || "An unknown error occurred.";
+    if (errorMessage.includes('429')) {
+      return NextResponse.json({ error: 'Rate limited by API. Please try again in a moment.' }, { status: 429 });
+    }
+    return NextResponse.json({ error: errorMessage, stack: String(err) }, { status: 500 });
   }
 }
