@@ -13,20 +13,22 @@ import { Transaction } from '@/lib/types';
 import { WalletDetailSheet } from './wallet-detail-sheet';
 import { GraphNode, GraphLink, PhysicsState } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles } from './wallet-relationship-graph-utils';
+import { Checkbox } from '../ui/checkbox';
+import { Separator } from '../ui/separator';
+
+const legendItems = [
+    { key: 'root', label: 'You' },
+    { key: 'exchange', label: 'Exchange' },
+    { key: 'platform', label: 'DEX/Platform' },
+    { key: 'whale', label: 'Whale (>100k)' },
+    { key: 'shark', label: 'Shark (50k-100k)' },
+    { key: 'dolphin', label: 'Dolphin (10k-50k)' },
+    { key: 'fish', label: 'Fish (1k-10k)' },
+    { key: 'shrimp', label: 'Shrimp (<1k)' },
+    { key: 'bridge', label: 'Bridge' },
+];
 
 const GraphLegend = () => {
-    const legendItems = [
-        { key: 'root', label: 'You' },
-        { key: 'exchange', label: 'Exchange' },
-        { key: 'platform', label: 'DEX/Platform' },
-        { key: 'whale', label: 'Whale (>100k)' },
-        { key: 'shark', label: 'Shark (50k-100k)' },
-        { key: 'dolphin', label: 'Dolphin (10k-50k)' },
-        { key: 'fish', label: 'Fish (1k-10k)' },
-        { key: 'shrimp', label: 'Shrimp (<1k)' },
-        { key: 'bridge', label: 'Bridge' },
-    ];
-
     return (
         <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm p-4 rounded-lg border border-border/50">
             <h4 className="font-semibold text-foreground text-sm mb-3">Legend</h4>
@@ -64,6 +66,8 @@ interface WalletNetworkGraphProps {
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
 }
 
+const ALL_NODE_TYPES = legendItems.map(item => item.key);
+
 export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -73,6 +77,13 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
     const [minVolume, setMinVolume] = useState(0);
     const debouncedMinVolume = useDebounce(minVolume, 500);
     const [minTransactions, setMinTransactions] = useState(1);
+    const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(ALL_NODE_TYPES);
+
+    const handleNodeTypeToggle = (nodeType: string, checked: boolean) => {
+        setVisibleNodeTypes(prev => 
+            checked ? [...prev, nodeType] : prev.filter(t => t !== nodeType)
+        );
+    };
     
     const { nodes, links } = useMemo(() => {
         if (!transactions || transactions.length === 0) {
@@ -82,14 +93,16 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
         const graphData = processTransactions(transactions, walletAddress, maxDepth);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
-            node.balance >= debouncedMinVolume && node.transactionCount >= minTransactions
+            node.balance >= debouncedMinVolume && 
+            node.transactionCount >= minTransactions &&
+            (visibleNodeTypes.includes(node.type) || node.type === 'root')
         );
         const nodeIds = new Set(nodesWithMinTx.map(n => n.id));
 
         const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
-    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth]);
+    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes]);
 
     
     useEffect(() => {
@@ -227,6 +240,24 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
                                     <Label className="text-sm">Max Depth: {maxDepth}</Label>
                                     <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={5} step={1} />
                                 </div>
+                            </div>
+                        </div>
+                        <Separator />
+                        <div>
+                            <h4 className="font-semibold mb-4 text-foreground">Filter by Type</h4>
+                            <div className="space-y-2">
+                                {legendItems.filter(item => item.key !== 'root').map((item) => (
+                                    <div key={item.key} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`filter-${item.key}`}
+                                            checked={visibleNodeTypes.includes(item.key)}
+                                            onCheckedChange={(checked) => handleNodeTypeToggle(item.key, !!checked)}
+                                        />
+                                        <Label htmlFor={`filter-${item.key}`} className="text-sm font-normal">
+                                            {item.label}
+                                        </Label>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
