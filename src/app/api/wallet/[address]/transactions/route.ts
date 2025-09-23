@@ -8,6 +8,27 @@ import type { FlattenedTransaction, Transaction } from "@/lib/types";
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
+const getTokenPrices = async (mints: string[]) => {
+    if (mints.length === 0 || !HELIUS_API_KEY) return {};
+    const helius = new Helius(HELIUS_API_KEY);
+    const prices: { [mint: string]: number } = {};
+
+    const pricePromises = mints.map(mint => 
+        helius.rpc.getAsset(mint).then(asset => ({ mint, price: asset?.token_info?.price_info?.price_per_token }))
+    );
+
+    const results = await Promise.allSettled(pricePromises);
+
+    results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.price) {
+            prices[result.value.mint] = result.value.price;
+        }
+    });
+
+    return prices;
+};
+
+
 const getSolanaPrice = async () => {
     if (!HELIUS_API_KEY) return null;
     try {
@@ -20,9 +41,10 @@ const getSolanaPrice = async () => {
     }
 };
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, solPrice: number | null): FlattenedTransaction[] => {
+const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
+    const solPrice = prices['So11111111111111111111111111111111111111112'] ?? null;
 
     transactions.forEach(tx => {
         let hasRelevantTransfer = false;
@@ -33,14 +55,16 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
             transfers.forEach(transfer => {
                 const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress || transfer.owner === walletAddress;
                 
-                if (isOwnerInvolved && transfer.amount > 0) {
+                if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
                     hasRelevantTransfer = true;
                     
                     const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.tokenAmount;
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
-                    const valueUSD = isNative && solPrice ? (Math.abs(finalAmount) * solPrice) : null;
+                    const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
+                    const price = prices[mint];
+                    const valueUSD = price ? (Math.abs(amountRaw) * price) : null;
                     
                     flattenedTxs.push({
                         ...tx,
@@ -48,7 +72,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
                         symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
-                        mint: isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint,
+                        mint: mint,
                         from: transfer.fromUserAccount,
                         to: transfer.toUserAccount,
                         by: tx.feePayer,
@@ -113,13 +137,10 @@ export async function GET(
     const limit = parseInt(searchParams.get("limit") || "50", 10);
     const before = searchParams.get("before") || undefined;
 
-    const [signatures, solPrice] = await Promise.all([
-        connection.getSignaturesForAddress(pubkey, {
-            limit,
-            before
-        }),
-        getSolanaPrice()
-    ]);
+    const signatures = await connection.getSignaturesForAddress(pubkey, {
+        limit,
+        before
+    });
     
     if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null, addressBalances: {} });
@@ -130,7 +151,19 @@ export async function GET(
     const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
     const txArray = Array.isArray(parsedTxs) ? parsedTxs : [];
 
-    const processedTxs = processHeliusTransactions(txArray, params.address, solPrice);
+    const tokenMints = new Set<string>();
+    tokenMints.add('So11111111111111111111111111111111111111112'); // Always get SOL price
+    txArray.forEach(tx => {
+        if (tx.tokenTransfers) {
+            tx.tokenTransfers.forEach(transfer => {
+                if(transfer.mint) tokenMints.add(transfer.mint);
+            })
+        }
+    });
+    
+    const prices = await getTokenPrices(Array.from(tokenMints));
+
+    const processedTxs = processHeliusTransactions(txArray, params.address, prices);
     
     const allAddresses = new Set<string>();
     processedTxs.forEach(tx => {
@@ -172,3 +205,5 @@ export async function GET(
     );
   }
 }
+
+    
