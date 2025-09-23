@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Copy, Check, ExternalLink } from 'lucide-react';
 import { shortenAddress } from '@/lib/solana-utils';
 import { useToast } from '@/hooks/use-toast';
-import { WalletDetails, Transaction } from '@/lib/types';
+import { WalletDetails, FlattenedTransaction } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
@@ -89,7 +89,7 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
     const { toast } = useToast();
     const [copied, setCopied] = useState(false);
     const [details, setDetails] = useState<WalletDetails | null>(null);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -154,11 +154,11 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
             };
         }
         
-        const sortedTxs = [...transactions].sort((a, b) => a.blockTime - b.blockTime);
+        const sortedTxs = [...transactions].sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
         const incoming = transactions.filter(tx => tx.type === 'received');
         const outgoing = transactions.filter(tx => tx.type === 'sent');
 
-        const aggregateVolume = (txs: Transaction[]) => {
+        const aggregateVolume = (txs: FlattenedTransaction[]) => {
             const volumeMap: Record<string, number> = {};
             txs.forEach(tx => {
                 if (tx.valueUSD && tx.valueUSD > 0) {
