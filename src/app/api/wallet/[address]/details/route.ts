@@ -47,7 +47,7 @@ const getTokenPrices = unstable_cache(
 );
 
 
-const getSolanaPrice = unstable_cache(
+export const getSolanaPrice = unstable_cache(
     async () => {
         if (!heliusApiKey) return null;
         try {

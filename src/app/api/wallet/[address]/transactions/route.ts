@@ -3,12 +3,13 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
+import { getSolanaPrice } from "../details/route";
 
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string): FlattenedTransaction[] => {
+const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, solPrice: number | null): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
 
@@ -27,7 +28,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
-                    const valueUSD = isNative ? (Math.abs(finalAmount) * 150) : null; // Simple SOL price estimate
+                    const valueUSD = isNative && solPrice ? (Math.abs(finalAmount) * solPrice) : null;
 
                     flattenedTxs.push({
                         ...tx,
@@ -100,10 +101,13 @@ export async function GET(
     const limit = parseInt(searchParams.get("limit") || "50", 10);
     const before = searchParams.get("before") || undefined;
 
-    const signatures = await connection.getSignaturesForAddress(pubkey, {
-      limit,
-      before
-    });
+    const [signatures, solPrice] = await Promise.all([
+        connection.getSignaturesForAddress(pubkey, {
+            limit,
+            before
+        }),
+        getSolanaPrice()
+    ]);
     
     if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null, addressBalances: {} });
@@ -114,7 +118,7 @@ export async function GET(
     const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
     const txArray = Array.isArray(parsedTxs) ? parsedTxs : [];
 
-    const processedTxs = processHeliusTransactions(txArray, params.address);
+    const processedTxs = processHeliusTransactions(txArray, params.address, solPrice);
     
     // --- New: Fetch balances for all involved addresses ---
     const allAddresses = new Set<string>();
