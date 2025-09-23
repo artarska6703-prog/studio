@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -9,7 +8,7 @@ import { shortenAddress } from '@/lib/solana-utils';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { formatDistanceToNow, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { Copy, Check, ChevronLeft, ChevronRight, Search, ArrowUp, ArrowDown, SlidersHorizontal, Download, MoreHorizontal, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Copy, Check, Filter, Download, MoreHorizontal, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -22,6 +21,7 @@ import type { DateRange } from 'react-day-picker';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
+import { AddressFilter, AddressFilterPopover } from './address-filter-popover';
 
 interface TransactionTableProps {
   transactions: FlattenedTransaction[];
@@ -122,11 +122,9 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
   const [directionFilter, setDirectionFilter] = useState('all');
   const [minValueFilter, setMinValueFilter] = useState('');
   const debouncedMinValue = useDebounce(minValueFilter, 500);
-  const [fromFilter, setFromFilter] = useState('');
-  const debouncedFromFilter = useDebounce(fromFilter, 500);
-  const [toFilter, setToFilter] = useState('');
-  const debouncedToFilter = useDebounce(toFilter, 500);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [fromFilters, setFromFilters] = useState<AddressFilter[]>([]);
+  const [toFilters, setToFilters] = useState<AddressFilter[]>([]);
   
   const tokenMap = useMemo(() => {
     const map = new Map<string, TokenHolding>();
@@ -149,32 +147,42 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
     const validMinValue = isNaN(minValue) ? 0 : minValue;
 
     return transactions.filter(tx => {
-          if (!tx) return false;
-          
-          if (validMinValue > 0 && (tx.valueUSD === null || Math.abs(tx.valueUSD) < validMinValue)) return false;
-          
-          const tokenMatch = tokenFilter === 'all' || 
-                             (tokenFilter === 'sol' && tx.mint === 'So11111111111111111111111111111111111111112') ||
-                             (tokenFilter === 'spl' && tx.mint !== 'So1111111111111111111111111111111111111111112');
-                             
-          const directionMatch = directionFilter === 'all' ||
-                                 (directionFilter === 'in' && tx.amount > 0) ||
-                                 (directionFilter === 'out' && tx.amount < 0) ||
-                                 (directionFilter === 'program' && tx.type === 'program_interaction');
+        if (!tx) return false;
+        
+        if (validMinValue > 0 && (tx.valueUSD === null || Math.abs(tx.valueUSD) < validMinValue)) return false;
+        
+        const tokenMatch = tokenFilter === 'all' || 
+                            (tokenFilter === 'sol' && tx.mint === 'So11111111111111111111111111111111111111112') ||
+                            (tokenFilter === 'spl' && tx.mint !== 'So1111111111111111111111111111111111111111112');
+                            
+        const directionMatch = directionFilter === 'all' ||
+                                (directionFilter === 'in' && tx.amount > 0) ||
+                                (directionFilter === 'out' && tx.amount < 0) ||
+                                (directionFilter === 'program' && tx.type === 'program_interaction');
 
-          
-          const dateMatch = !dateRange?.from || 
-                            (tx.blockTime ? isWithinInterval(new Date(tx.blockTime * 1000), { 
-                                start: startOfDay(dateRange.from), 
-                                end: dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from)
-                            }) : true);
+        
+        const dateMatch = !dateRange?.from || 
+                          (tx.blockTime ? isWithinInterval(new Date(tx.blockTime * 1000), { 
+                              start: startOfDay(dateRange.from), 
+                              end: dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from)
+                          }) : true);
+        
+        const checkAddressFilters = (address: string | null, filters: AddressFilter[]) => {
+            if (filters.length === 0) return true;
+            if (!address) return false;
+            // For a transaction to be included, it must satisfy all filters
+            return filters.every(filter => {
+                const addressMatch = address.toLowerCase().includes(filter.address.toLowerCase());
+                return filter.type === 'include' ? addressMatch : !addressMatch;
+            });
+        };
 
-          const fromMatch = !debouncedFromFilter || (tx.from && tx.from.toLowerCase().includes(debouncedFromFilter.toLowerCase()));
-          const toMatch = !debouncedToFilter || (tx.to && tx.to.toLowerCase().includes(debouncedToFilter.toLowerCase()));
+        const fromMatch = checkAddressFilters(tx.from, fromFilters);
+        const toMatch = checkAddressFilters(tx.to, toFilters);
 
-          return tokenMatch && directionMatch && dateMatch && fromMatch && toMatch;
-      });
-  }, [transactions, tokenFilter, directionFilter, debouncedMinValue, dateRange, debouncedFromFilter, debouncedToFilter]);
+        return tokenMatch && directionMatch && dateMatch && fromMatch && toMatch;
+    });
+  }, [transactions, tokenFilter, directionFilter, debouncedMinValue, dateRange, fromFilters, toFilters]);
   
   const totalPages = useMemo(() => {
       const total = Math.ceil(filteredTransactions.length / rowsPerPage);
@@ -194,7 +202,7 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
 
   useEffect(() => {
     setPage(1);
-  }, [rowsPerPage, tokenFilter, directionFilter, debouncedMinValue, dateRange, debouncedFromFilter, debouncedToFilter]);
+  }, [rowsPerPage, tokenFilter, directionFilter, debouncedMinValue, dateRange, fromFilters, toFilters]);
 
   const handleRowsPerPageChange = (value: string) => {
     setRowsPerPage(parseInt(value, 10));
@@ -268,20 +276,6 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
                 {dateRange && <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)}>Clear</Button>}
             </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <Input 
-                placeholder="Filter From address..."
-                className="h-8"
-                value={fromFilter}
-                onChange={(e) => setFromFilter(e.target.value)}
-             />
-             <Input 
-                placeholder="Filter To address..."
-                className="h-8"
-                value={toFilter}
-                onChange={(e) => setToFilter(e.target.value)}
-             />
-        </div>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -290,8 +284,18 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
               <TableRow>
                 <TableHead>Time</TableHead>
                 <TableHead>Action</TableHead>
-                <TableHead>From</TableHead>
-                <TableHead>To</TableHead>
+                <TableHead>
+                    <div className="flex items-center gap-2">
+                        From
+                        <AddressFilterPopover onApply={setFromFilters} />
+                    </div>
+                </TableHead>
+                <TableHead>
+                    <div className="flex items-center gap-2">
+                        To
+                        <AddressFilterPopover onApply={setToFilters} />
+                    </div>
+                </TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-right">Value</TableHead>
                 <TableHead className="text-right">Token</TableHead>
@@ -415,9 +419,3 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
     </Card>
   );
 }
-
-    
-
-    
-
-    
