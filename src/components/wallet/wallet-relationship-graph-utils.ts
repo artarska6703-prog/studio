@@ -32,7 +32,7 @@ export interface PhysicsState {
   avoidOverlap: number;
 }
 
-const getNodeType = (address: string, balanceUSD: number | null): string => {
+const getNodeType = (address: string, balance: number, balanceUSD: number | null): string => {
     const lowerAddress = address.toLowerCase();
     const keywords = {
         exchange: ['binance', 'coinbase', 'kraken', 'ftx', 'kucoin'],
@@ -51,14 +51,18 @@ const getNodeType = (address: string, balanceUSD: number | null): string => {
     if (usd > 50000) return 'shark';
     if (usd > 10000) return 'dolphin';
     if (usd > 1000) return 'fish';
+    
+    // Fallback to SOL balance if USD value is low or unavailable
+    if (balance > 100) return 'fish';
+    
     return 'shrimp';
 };
 
 const getMass = (balance: number, balanceUSD: number | null) => {
     // Prioritize USD for mass calculation, but fall back to SOL balance if USD is not available.
-    const value = balanceUSD !== null && balanceUSD > 0 ? balanceUSD : balance;
+    const value = balanceUSD !== null && balanceUSD > 0 ? balanceUSD : (balance * 150); // Use a default price for scaling if no live price
     const baseMass = Math.log1p(value) || 1;
-    const type = getNodeType('', balanceUSD);
+    const type = getNodeType('', balance, balanceUSD);
 
     if (type === 'exchange' || type === 'platform') return baseMass * 50;
     if (type === 'whale') return baseMass * 10;
@@ -69,10 +73,10 @@ const getMass = (balance: number, balanceUSD: number | null) => {
 
 const getNodeSize = (balance: number, balanceUSD: number | null) => {
     // Prioritize USD for size calculation, but fall back to SOL balance if USD is not available.
-    const value = (balanceUSD !== null && balanceUSD > 0) ? balanceUSD : balance;
+    const value = (balanceUSD !== null && balanceUSD > 0) ? balanceUSD : (balance * 150); // Use a default price for scaling
     // Add a fallback for value to prevent Math.log1p(0) which is 0.
     const baseSize = 5 + Math.log1p(value || 1);
-    const type = getNodeType('', balanceUSD);
+    const type = getNodeType('', balance, balanceUSD);
     
     if (type === 'exchange' || type === 'platform') return baseSize * 3.5;
     if (type === 'whale') return baseSize * 2.5;
@@ -104,7 +108,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 adjacencyList[address] = [];
             }
             addressData[address].txCount++;
-            const value = 'valueUSD' in tx ? tx.valueUSD : tx.events?.nft?.amount;
+            const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null);
             if (value && value > 0) {
                  addressData[address].interactionVolume += value;
             }
@@ -117,7 +121,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
             if (!adjacencyList[to].includes(from)) adjacencyList[to].push(from);
 
             const linkId = [from, to].sort().join('-');
-            const value = 'valueUSD' in tx ? tx.valueUSD : tx.events?.nft?.amount;
+            const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null);
 
             if (!allLinks[linkId]) {
                 allLinks[linkId] = { from: from, to: to, value: 0, volume: 0 };
@@ -165,7 +169,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
             const { txCount } = addressData[address];
             const balance = addressBalances[address] || 0;
             const balanceUSD = solPrice ? balance * solPrice : null; 
-            let nodeType = getNodeType(address, balanceUSD);
+            let nodeType = getNodeType(address, balance, balanceUSD);
             let group = nodeType;
             let label = shortenAddress(address, 4);
             let fixed = false;

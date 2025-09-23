@@ -18,6 +18,9 @@ import { useRouter } from 'next/navigation';
 import { shortenAddress } from '@/lib/solana-utils';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { Settings } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Button } from '../ui/button';
 
 const legendItems = [
     { key: 'root', label: 'You' },
@@ -105,6 +108,78 @@ interface WalletNetworkGraphProps {
 
 const ALL_NODE_TYPES = legendItems.map(item => item.key);
 
+const PhysicsControls = ({ physicsState, setPhysicsState }: { physicsState: PhysicsState, setPhysicsState: React.Dispatch<React.SetStateAction<PhysicsState>> }) => {
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="outline" size="icon" className="absolute top-4 right-4">
+                    <Settings className="h-4 w-4" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+                <div className="grid gap-4">
+                    <div className="space-y-2">
+                        <h4 className="font-medium leading-none">Physics Controls</h4>
+                        <p className="text-sm text-muted-foreground">
+                            Fine-tune the graph simulation.
+                        </p>
+                    </div>
+                    <div className="grid gap-2">
+                        <div className="grid grid-cols-3 items-center gap-4">
+                            <Label htmlFor="gravitationalConstant">Gravity</Label>
+                            <Slider
+                                id="gravitationalConstant"
+                                value={[physicsState.gravitationalConstant]}
+                                onValueChange={(v) => setPhysicsState(s => ({ ...s, gravitationalConstant: v[0] }))}
+                                min={-20000}
+                                max={0}
+                                step={1000}
+                                className="col-span-2"
+                            />
+                        </div>
+                        <div className="grid grid-cols-3 items-center gap-4">
+                            <Label htmlFor="springLength">Spring Length</Label>
+                            <Slider
+                                id="springLength"
+                                value={[physicsState.springLength]}
+                                onValueChange={(v) => setPhysicsState(s => ({ ...s, springLength: v[0] }))}
+                                min={50}
+                                max={500}
+                                step={10}
+                                className="col-span-2"
+                            />
+                        </div>
+                        <div className="grid grid-cols-3 items-center gap-4">
+                            <Label htmlFor="springConstant">Stiffness</Label>
+                            <Slider
+                                id="springConstant"
+                                value={[physicsState.springConstant]}
+                                onValueChange={(v) => setPhysicsState(s => ({ ...s, springConstant: v[0] }))}
+                                min={0.01}
+                                max={0.5}
+                                step={0.01}
+                                className="col-span-2"
+                            />
+                        </div>
+                         <div className="grid grid-cols-3 items-center gap-4">
+                            <Label htmlFor="damping">Damping</Label>
+                            <Slider
+                                id="damping"
+                                value={[physicsState.damping]}
+                                onValueChange={(v) => setPhysicsState(s => ({ ...s, damping: v[0] }))}
+                                min={0.01}
+                                max={1}
+                                step={0.01}
+                                className="col-span-2"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
+}
+
 export function WalletNetworkGraph({ walletAddress, transactions = [], addressBalances, solPrice, onDiagnosticDataUpdate, onNodeClick }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
@@ -145,7 +220,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
         const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances, solPrice);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
-            (node.balanceUSD ?? 0) >= debouncedMinVolume &&
+            (node.interactionVolume ?? 0) >= debouncedMinVolume &&
             node.transactionCount >= minTransactions &&
             (visibleNodeTypes.includes(node.type) || node.type === 'root')
         );
@@ -313,7 +388,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
                             <h4 className="font-semibold mb-4 text-foreground">Graph Filters</h4>
                             <div className="space-y-4">
                                 <div>
-                                    <Label className="text-sm">Min Volume (USD): ${minVolume.toLocaleString()}</Label>
+                                    <Label className="text-sm">Min Interaction Volume (USD): ${minVolume.toLocaleString()}</Label>
                                     <Slider value={[minVolume]} onValueChange={(v) => setMinVolume(v[0])} min={0} max={10000} step={100}/>
                                 </div>
                                 <div>
@@ -322,7 +397,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
                                 </div>
                                 <div>
                                     <Label className="text-sm">Max Depth: {maxDepth}</Label>
-                                    <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={3} step={1} />
+                                    <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={5} step={1} />
                                 </div>
                             </div>
                         </div>
@@ -349,6 +424,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
                 <div className="md:col-span-9 lg:col-span-9 h-[800px] bg-gradient-to-br from-slate-900 to-slate-950 rounded-r-lg relative">
                     <div ref={containerRef} className="w-full h-full" />
                     <GraphLegend />
+                    <PhysicsControls physicsState={physicsState} setPhysicsState={setPhysicsState} />
                     <CustomTooltip node={tooltipData.node} position={tooltipData.position} />
                 </div>
             </CardContent>

@@ -20,9 +20,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PortfolioCompositionChart } from '@/components/wallet/portfolio-composition-chart';
-import { processTransactions } from '@/components/wallet/wallet-relationship-graph-utils';
 import type { DateRange } from 'react-day-picker';
-import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 const TXN_PAGE_SIZE = 50;
@@ -196,6 +194,18 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
 
   }, [useMockData, transactions, mockScenario, address, dateRange]);
 
+  const displayedDetails = useMemo(() => {
+    if (useMockData) {
+      return { address: address, balance: 1234.56, balanceUSD: 1234.56 * 150, tokens: [] };
+    }
+    return walletDetails;
+  }, [useMockData, walletDetails, address]);
+  
+  const solPrice = useMemo(() => {
+    if (!displayedDetails || !displayedDetails.balance || !displayedDetails.balanceUSD) return null;
+    return displayedDetails.balanceUSD / displayedDetails.balance;
+  }, [displayedDetails]);
+
   if (isLoading && !useMockData) {
       return <Loading />;
   }
@@ -218,15 +228,9 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     )
   }
 
-  if (!walletDetails && !useMockData) {
+  if (!displayedDetails && !useMockData) {
     return <Loading />; // Should be covered by isLoading but as a fallback
   }
-
-  const displayedDetails = useMockData 
-    ? { address: address, balance: 1234.56, balanceUSD: 1234.56 * 150, tokens: [] } // Fake details for mock
-    : walletDetails;
-
-  const solPrice = displayedDetails?.balanceUSD && displayedDetails?.balance ? displayedDetails.balanceUSD / displayedDetails.balance : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
@@ -304,8 +308,20 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
 
                   </div>
                    <div className="flex items-center gap-2">
-                      <DatePickerWithRange date={dateRange} setDate={setDateRange} />
-                      {dateRange && <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)}>Clear</Button>}
+                      <div className="relative">
+                        <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                        {dateRange && 
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => setDateRange(undefined)}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8"
+                          >
+                            <span className="sr-only">Clear date range</span>
+                            &times;
+                          </Button>
+                        }
+                      </div>
                       <Button asChild variant="outline">
                         <Link href={`/diagnostic?address=${address}&scenario=${useMockData ? mockScenario : 'real'}`}>
                           <LineChart className="mr-2 h-4 w-4"/>

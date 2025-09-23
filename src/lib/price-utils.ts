@@ -26,7 +26,7 @@ export const getTokenPrices = async (mints: string[]): Promise<{ [mint: string]:
                 }
             });
         } catch (e) {
-            console.error("[Price Utils] Helius getAssetBatch failed. Will try Jupiter for all mints.", e);
+            console.error("[Price Utils] Helius getAssetBatch failed. Will try Jupiter for all remaining mints.", e);
         }
     }
 
