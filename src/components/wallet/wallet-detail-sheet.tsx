@@ -102,7 +102,7 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                 try {
                     const [detailsRes, txRes] = await Promise.all([
                         fetch(`/api/wallet/${address}/details`),
-                        fetch(`/api/wallet/${address}/transactions?limit=500`)
+                        fetch(`/api/wallet/${address}/transactions?limit=50`)
                     ]);
                     
                     if (!detailsRes.ok) {
