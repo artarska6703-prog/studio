@@ -4,56 +4,10 @@ import { LAMPORTS_PER_SOL, PublicKey, Connection } from '@solana/web3.js';
 import type { TokenHolding, WalletDetails } from '@/lib/types';
 import { isValidSolanaAddress } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
+import { getTokenPrices, getSolanaPrice } from '@/lib/price-utils';
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
 const rpcEndpoint = process.env.SYNDICA_RPC_URL;
-
-const getTokenPrices = async (mints: string[]) => {
-    if (mints.length === 0 || !heliusApiKey) return {};
-    const helius = new Helius(heliusApiKey);
-    const prices: { [mint: string]: number } = {};
-    
-    const pricePromises = mints.map(mint => 
-        helius.rpc.getAsset(mint).then(asset => ({ mint, price: asset?.token_info?.price_info?.price_per_token }))
-    );
-
-    const results = await Promise.allSettled(pricePromises);
-
-    results.forEach(result => {
-        if (result.status === 'fulfilled' && result.value.price) {
-            prices[result.value.mint] = result.value.price;
-        }
-    });
-
-    return prices;
-};
-
-const getSolanaPrice = async (): Promise<number | null> => {
-    if (!heliusApiKey) return null;
-    try {
-        const helius = new Helius(heliusApiKey);
-        const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
-        const heliusPrice = asset?.token_info?.price_info?.price_per_token;
-        if (heliusPrice) {
-            return heliusPrice;
-        }
-    } catch (e) {
-        console.error("Helius SOL price fetch failed, trying Jupiter.", e);
-    }
-    
-    try {
-        const jupiterResponse = await fetch('https://price.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
-        if (jupiterResponse.ok) {
-            const jupiterData = await jupiterResponse.json();
-            const jupiterPrice = jupiterData.data['So1111111111111111111111111111111111111111112']?.price;
-            if (jupiterPrice) return jupiterPrice;
-        }
-    } catch (e) {
-         console.error("Fallback to Jupiter for SOL price failed.", e);
-    }
-    
-    return null;
-};
 
 
 export async function GET(
