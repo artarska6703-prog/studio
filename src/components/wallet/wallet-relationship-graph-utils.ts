@@ -45,15 +45,18 @@ const getNodeType = (address: string, balance: number): string => {
         }
     }
 
-    if (balance > 100000) return 'whale';
-    if (balance > 50000) return 'shark';
-    if (balance > 10000) return 'dolphin';
-    if (balance > 1000) return 'fish';
+    const solBalanceInUsd = balance * 150; // Approximate price
+
+    if (solBalanceInUsd > 100000) return 'whale';
+    if (solBalanceInUsd > 50000) return 'shark';
+    if (solBalanceInUsd > 10000) return 'dolphin';
+    if (solBalanceInUsd > 1000) return 'fish';
     return 'shrimp';
 };
 
-const getMass = (balance: number, type: string) => {
+const getMass = (balance: number) => {
     const baseMass = Math.log1p(balance) || 1;
+    const type = getNodeType('', balance); // Balance is now SOL amount, not USD
     if (type === 'exchange' || type === 'platform') return baseMass * 50;
     if (type === 'whale') return baseMass * 10;
     if (type === 'shark') return baseMass * 5;
@@ -61,8 +64,9 @@ const getMass = (balance: number, type: string) => {
     return baseMass;
 }
 
-const getNodeSize = (balance: number, type: string) => {
+const getNodeSize = (balance: number) => {
     const baseSize = 5 + Math.log1p(balance);
+    const type = getNodeType('', balance); // Balance is now SOL amount, not USD
     if (type === 'exchange' || type === 'platform') return baseSize * 3.5;
     if (type === 'whale') return baseSize * 2.5;
     if (type === 'shark') return baseSize * 1.5;
@@ -70,12 +74,12 @@ const getNodeSize = (balance: number, type: string) => {
     return baseSize;
 }
 
-export const processTransactions = (transactions: (Transaction | FlattenedTransaction)[], rootAddress: string, maxDepth: number): { nodes: GraphNode[], links: GraphLink[] } => {
+export const processTransactions = (transactions: (Transaction | FlattenedTransaction)[], rootAddress: string, maxDepth: number, addressBalances: { [key: string]: number }): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
     }
 
-    const addressData: { [key: string]: { balance: number; txCount: number; } } = {};
+    const addressData: { [key: string]: { txCount: number; interactionVolume: number } } = {};
     const allLinks: { [key: string]: GraphLink } = {};
     const adjacencyList: { [key: string]: string[] } = {};
 
@@ -87,7 +91,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
         
         participants.forEach(address => {
             if (!addressData[address]) {
-                addressData[address] = { balance: 0, txCount: 0 };
+                addressData[address] = { txCount: 0, interactionVolume: 0 };
             }
              if (!adjacencyList[address]) {
                 adjacencyList[address] = [];
@@ -95,7 +99,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
             addressData[address].txCount++;
             const value = 'valueUSD' in tx ? tx.valueUSD : tx.events?.nft?.amount;
             if (value && value > 0) {
-                 addressData[address].balance += value;
+                 addressData[address].interactionVolume += value;
             }
         });
 
@@ -121,7 +125,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
     });
 
     const nodeDepths = new Map<string, number>();
-    if (addressData[rootAddress]) {
+    if (Object.keys(addressData).includes(rootAddress)) {
       const queue: [string, number][] = [[rootAddress, 0]];
       const visited = new Set<string>([rootAddress]);
       nodeDepths.set(rootAddress, 0);
@@ -152,7 +156,8 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
     const nodes: GraphNode[] = Object.keys(addressData)
         .filter(address => filteredNodeIds.has(address))
         .map(address => {
-            const { balance, txCount } = addressData[address];
+            const { txCount, interactionVolume } = addressData[address];
+            const balance = addressBalances[address] || 0;
             let nodeType = getNodeType(address, balance);
             let group = nodeType;
             let label = shortenAddress(address, 4);
@@ -173,13 +178,13 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 type: nodeType,
                 notes: '',
                 shape: 'dot',
-                value: getNodeSize(balance, nodeType),
-                mass: getMass(balance, nodeType),
+                value: getNodeSize(balance),
+                mass: getMass(balance),
                 group: group,
                 fixed: fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
-                title: `Address: ${address}<br>Interaction Volume: ${formatCurrency(balance)}<br>Transactions: ${txCount}<br>Type: ${nodeType}<br>Hops: ${nodeDepths.get(address) ?? 'N/A'}`,
+                title: `Address: ${address}<br>Balance: ${balance.toFixed(2)} SOL<br>Interaction Volume: ${formatCurrency(interactionVolume)}<br>Transactions: ${txCount}<br>Type: ${nodeType}<br>Hops: ${nodeDepths.get(address) ?? 'N/A'}`,
             };
         });
 

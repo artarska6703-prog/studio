@@ -20,11 +20,11 @@ const legendItems = [
     { key: 'root', label: 'You' },
     { key: 'exchange', label: 'Exchange' },
     { key: 'platform', label: 'DEX/Platform' },
-    { key: 'whale', label: 'Whale (>100k)' },
-    { key: 'shark', label: 'Shark (50k-100k)' },
-    { key: 'dolphin', label: 'Dolphin (10k-50k)' },
-    { key: 'fish', label: 'Fish (1k-10k)' },
-    { key: 'shrimp', label: 'Shrimp (<1k)' },
+    { key: 'whale', label: 'Whale (>$100k)' },
+    { key: 'shark', label: 'Shark ($50k-$100k)' },
+    { key: 'dolphin', label: 'Dolphin ($10k-$50k)' },
+    { key: 'fish', label: 'Fish ($1k-$10k)' },
+    { key: 'shrimp', label: 'Shrimp (<$1k)' },
     { key: 'bridge', label: 'Bridge' },
 ];
 
@@ -63,13 +63,14 @@ export interface DiagnosticData {
 interface WalletNetworkGraphProps {
     walletAddress: string;
     transactions: Transaction[];
+    addressBalances: { [key: string]: number };
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
     onNodeClick?: (address: string) => void;
 }
 
 const ALL_NODE_TYPES = legendItems.map(item => item.key);
 
-export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnosticDataUpdate, onNodeClick }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions = [], addressBalances, onDiagnosticDataUpdate, onNodeClick }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     
@@ -100,10 +101,10 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             return { nodes: [], links: [] };
         }
         
-        const graphData = processTransactions(transactions, walletAddress, maxDepth);
+        const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
-            node.balance >= debouncedMinVolume && 
+            node.balance * 150 >= debouncedMinVolume && // Filter by USD value
             node.transactionCount >= minTransactions &&
             (visibleNodeTypes.includes(node.type) || node.type === 'root')
         );
@@ -112,7 +113,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
         const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
-    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes]);
+    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, addressBalances]);
     
     useEffect(() => {
         onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });
@@ -284,5 +285,3 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
         </Card>
     );
 }
-
-    

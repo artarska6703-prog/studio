@@ -36,6 +36,7 @@ type WalletPageViewProps = {
 export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
+  const [addressBalances, setAddressBalances] = useState<{ [key: string]: number }>({});
   const [expandedWallets, setExpandedWallets] = useState<Set<string>>(new Set());
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +67,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             }
             
             setTransactions(prev => [...prev, ...(txData.transactions || [])]);
+            setAddressBalances(prev => ({ ...prev, ...txData.addressBalances }));
             setNextSignature(txData.nextCursor);
 
         } catch (e: any) {
@@ -87,7 +89,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         if (data.error) {
             throw new Error(`Failed to fetch transactions for ${wallet}: ${data.error}`);
         }
-        return data.transactions || [];
+        return data; // Return full response { transactions, addressBalances }
     }, []);
 
 
@@ -101,6 +103,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             setIsLoading(true);
             setError(null);
             setTransactions([]);
+            setAddressBalances({});
             setNextSignature(null);
             
             try {
@@ -117,19 +120,30 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                 const allAddressesToFetch = [address, ...Array.from(expandedWallets)];
                 const transactionPromises = allAddressesToFetch.map(addr => fetchTransactionsForAddress(addr));
                 
-                const transactionResults = await Promise.all(transactionPromises);
+                const results = await Promise.all(transactionPromises);
                 
-                // Flatten results and remove duplicates
-                const combinedTransactions = transactionResults.flat();
+                let combinedTransactions: FlattenedTransaction[] = [];
+                let combinedBalances: { [key: string]: number } = {};
+
+                results.forEach(result => {
+                    if (result.transactions) {
+                        combinedTransactions.push(...result.transactions);
+                    }
+                    if (result.addressBalances) {
+                        combinedBalances = { ...combinedBalances, ...result.addressBalances };
+                    }
+                });
+
+                // Remove duplicate transactions
                 const uniqueTransactions = Array.from(new Map(combinedTransactions.map(tx => [tx.signature, tx])).values());
 
                 setTransactions(uniqueTransactions);
+                setAddressBalances(combinedBalances);
                 
-                // For now, pagination is only supported for the root address
-                const rootResult = await fetch(`/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}`);
-                const rootData = await rootResult.json();
-                if (rootData.nextCursor) {
-                    setNextSignature(rootData.nextCursor);
+                // For now, pagination is only supported for the root address from its own initial fetch
+                const rootResult = results.find((r, i) => allAddressesToFetch[i] === address);
+                if (rootResult && rootResult.nextCursor) {
+                    setNextSignature(rootResult.nextCursor);
                 }
 
             } catch (e: any) {
@@ -171,7 +185,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             }
         })();
         // The mock data needs the same processing as the real data.
-        const { nodes } = processTransactions(rawMockTxs, address, 5);
+        const { nodes } = processTransactions(rawMockTxs, address, 5, {});
         const balances = new Map(nodes.map(n => [n.id, n.balance]));
         
         allTransactions = rawMockTxs.map(tx => ({
@@ -316,9 +330,10 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                   </div>
                 </div>
                 <WalletNetworkGraph 
-                    key={useMockData ? `mock-${mockScenario}` : `real-${address}`}
+                    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${expandedWallets.size}`}
                     walletAddress={address}
                     transactions={liveTransactions}
+                    addressBalances={addressBalances}
                     onNodeClick={handleExpandNode}
                 />
             </TabsContent>

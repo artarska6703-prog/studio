@@ -106,21 +106,49 @@ export async function GET(
     });
     
     if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {
-      return NextResponse.json({ transactions: [], nextCursor: null });
+      return NextResponse.json({ transactions: [], nextCursor: null, addressBalances: {} });
     }
     
     const signatureStrings = signatures.map(s => s.signature);
     
     const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
+    const txArray = Array.isArray(parsedTxs) ? parsedTxs : [];
 
-    // Ensure parsedTxs is an array before processing
-    const processedTxs = processHeliusTransactions(Array.isArray(parsedTxs) ? parsedTxs : [], params.address);
+    const processedTxs = processHeliusTransactions(txArray, params.address);
     
+    // --- New: Fetch balances for all involved addresses ---
+    const allAddresses = new Set<string>();
+    processedTxs.forEach(tx => {
+      if (tx.from) allAddresses.add(tx.from);
+      if (tx.to) allAddresses.add(tx.to);
+    });
+
+    const addressBalances: { [key: string]: number } = {};
+    if (allAddresses.size > 0) {
+        try {
+            const balances = await connection.getMultipleAccountsInfo(
+                Array.from(allAddresses).map(addr => new PublicKey(addr))
+            );
+            balances.forEach((account, index) => {
+                const address = Array.from(allAddresses)[index];
+                if (account) {
+                    addressBalances[address] = account.lamports / LAMPORTS_PER_SOL;
+                } else {
+                    addressBalances[address] = 0;
+                }
+            });
+        } catch (e) {
+            console.error("Failed to fetch batch balances, proceeding without them.", e);
+        }
+    }
+    // --- End New ---
+
     const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
 
     return NextResponse.json({
       transactions: processedTxs,
       nextCursor,
+      addressBalances, // Return the new balances object
     });
   } catch (err: any) {
     console.error("Error fetching wallet transactions:", err);

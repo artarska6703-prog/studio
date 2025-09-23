@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DiagnosticData } from './wallet-relationship-graph';
+import { formatCurrency } from '@/lib/utils';
 
 interface DiagnosticProps {
   diagnosticData: DiagnosticData | null;
@@ -97,11 +98,11 @@ export const WalletCategorizationDiagnostic = ({ diagnosticData }: DiagnosticPro
     const categorizationRules = {
         exchange: 'Address keyword match (e.g., binance)',
         platform: 'Address keyword match (e.g., raydium, jupiter)',
-        whale: 'Balance > $100,000',
-        shark: 'Balance > $50,000',
-        dolphin: 'Balance > $10,000',
-        fish: 'Balance > $1,000',
-        shrimp: 'Balance <= $1,000',
+        whale: `Balance > ${formatCurrency(100000)}`,
+        shark: `Balance > ${formatCurrency(50000)}`,
+        dolphin: `Balance > ${formatCurrency(10000)}`,
+        fish: `Balance > ${formatCurrency(1000)}`,
+        shrimp: `Balance <= ${formatCurrency(1000)}`,
     };
   
     return (
@@ -222,13 +223,13 @@ export const VisualConfigurationDiagnostic = ({ diagnosticData }: DiagnosticProp
                 <div>
                     <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Node Sizing Rule:</h4>
                     <p className="text-sm p-2 bg-muted rounded-md">
-                        <code>value = 5 + Math.log1p(balance) * 3.5</code>
+                        <code>value = 5 + Math.log1p(balance)</code>
                     </p>
                 </div>
                  <div>
                     <h4 className="font-semibold mb-2 text-sm text-muted-foreground">Mass Rule:</h4>
                      <p className="text-sm p-2 bg-muted rounded-md">
-                        <code>mass = (Math.log1p(balance) || 1) * (balance > 100000 ? 5 : 1)</code>
+                        <code>mass = Math.log1p(balance) || 1</code>
                     </p>
                 </div>
             </CardContent>
