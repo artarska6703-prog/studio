@@ -6,43 +6,51 @@ import type { FlattenedTransaction, TokenHolding } from "@/lib/types";
 import { unstable_cache } from "next/cache";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
 const getTokenPrices = unstable_cache(
     async (mints: string[]) => {
         if (mints.length === 0) return {};
         try {
             const response = await fetch(`https://api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses=${mints.join(',')}&vs_currencies=usd`);
-            if (!response.ok) return {};
+            if (!response.ok) {
+                console.error(`CoinGecko API request failed for tokens: ${response.status} ${await response.text()}`);
+                return {};
+            }
             const data = await response.json();
             const prices: { [mint: string]: number } = {};
             for (const mint of mints) {
-                if (data[mint] && data[mint].usd) prices[mint] = data[mint].usd;
+                if (data[mint] && data[mint].usd) {
+                    prices[mint] = data[mint].usd;
+                }
             }
             return prices;
         } catch (error) {
+            console.error("Failed to fetch token prices from CoinGecko:", error);
             return {};
         }
     },
     ['token-prices'],
-    { revalidate: 60 * 5 }
+    { revalidate: 60 * 5 } // Revalidate every 5 minutes
 );
 
 const getSolanaPrice = unstable_cache(
     async () => {
         try {
             const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-            if (!response.ok) return null;
+            if (!response.ok) {
+                console.error(`CoinGecko API request failed for SOL: ${response.status} ${await response.text()}`);
+                return null;
+            }
             const data = await response.json();
             return data.solana.usd as number;
         } catch (error) {
+            console.error("Failed to fetch Solana price from CoinGecko:", error);
             return null;
         }
     },
     ['solana-price'],
-    { revalidate: 60 }
+    { revalidate: 60 } // Revalidate every 60 seconds
 );
-
 
 const processHeliusTransactions = (
     transactions: EnrichedTransaction[], 
@@ -71,9 +79,9 @@ const processHeliusTransactions = (
                     let valueUSD: number | null = null;
                     const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
                     const price = isNative ? solPrice : tokenPrices[mint];
-
+                    
                     if (price) {
-                        valueUSD = amountRaw * price;
+                        valueUSD = Math.abs(finalAmount) * price;
                     }
 
                     flattenedTxs.push({
