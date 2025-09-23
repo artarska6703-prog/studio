@@ -23,10 +23,10 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
             for (const transfer of transfers) {
                 const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress || transfer.owner === walletAddress;
                 
-                if (isOwnerInvolved && transfer.amount > 0) {
+                if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
                     hasRelevantTransfer = true;
                     
-                    const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.amount / Math.pow(10, transfer.decimals ?? 0);
+                    const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.tokenAmount;
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
@@ -178,3 +178,5 @@ export async function GET(
     );
   }
 }
+
+    
