@@ -13,8 +13,7 @@ const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
-    const solPrice = prices['So11111111111111111111111111111111111111112'] || null;
-
+    
     transactions.forEach(tx => {
         let hasRelevantTransfer = false;
         const blockTime = tx.timestamp || tx.blockTime;
