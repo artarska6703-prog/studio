@@ -27,11 +27,11 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
-                    // Crude value calculation, only for SOL. Full token pricing is complex.
-                    const valueUSD = (isNative && tx.events?.nft?.amount) ? (tx.events.nft.amount / LAMPORTS_PER_SOL) * 150 : null;
+                    const valueUSD = isNative ? (Math.abs(finalAmount) * 150) : null; // Simple SOL price estimate
 
                     flattenedTxs.push({
                         ...tx,
+                        blockTime: tx.blockTime, // Make sure blockTime is included
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
                         symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
@@ -41,7 +41,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                         by: tx.feePayer,
                         instruction: tx.type,
                         interactedWith: Array.from(new Set([tx.feePayer, transfer.fromUserAccount, transfer.toUserAccount].filter(a => a && a !== walletAddress))),
-                        valueUSD: valueUSD,
+                        valueUSD: valueUSD, // Use the fixed calculation
                     });
                 }
             });
