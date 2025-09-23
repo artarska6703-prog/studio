@@ -1,4 +1,4 @@
-import { WalletPageView } from "@/components/wallet/wallet-page-view";
+import { WalletPageView } from "@/components/wallet/wallet-page-client";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
 import { notFound } from "next/navigation";
 

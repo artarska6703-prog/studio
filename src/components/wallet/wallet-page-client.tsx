@@ -29,11 +29,11 @@ const TXN_PAGE_SIZE = 100;
 
 type MockScenario = 'balanced' | 'whale' | 'degen';
 
-type WalletPageClientProps = {
+type WalletPageViewProps = {
   address: string;
 };
 
-export default function WalletPageClient({ address }: WalletPageClientProps) {
+export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
   const [addressBalances, setAddressBalances] = useState<{ [key: string]: number }>({});
@@ -212,7 +212,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                         </>
                     ) : <p>No details to display.</p>}
                 </div>
-                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.sol.valueUSD} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
+                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.sol.valueUSD || 0} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
                  <TransactionTable 
