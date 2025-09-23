@@ -55,12 +55,12 @@ const AddressDisplay = ({ address }: { address: string | null }) => {
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5 group cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1.5 group">
                         <span className="font-code hover:underline">{shortenAddress(address, 8)}</span>
                         <div className="w-4 h-4 shrink-0">
                             {copied 
                                 ? <Check className="w-3 h-3 text-green-500" /> 
-                                : <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" onClick={handleCopy} />
+                                : <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 cursor-pointer" onClick={handleCopy} />
                             }
                         </div>
                     </div>
@@ -163,7 +163,7 @@ export function TransactionTable({
         
         const tokenMatch = tokenFilter === 'all' || 
                             (tokenFilter === 'sol' && tx.mint === 'So11111111111111111111111111111111111111112') ||
-                            (tokenFilter === 'spl' && tx.mint !== 'So1111111111111111111111111111111111111111112');
+                            (tokenFilter === 'spl' && tx.mint !== 'So11111111111111111111111111111111111111112');
                             
         const directionMatch = directionFilter === 'all' ||
                                 (directionFilter === 'in' && tx.amount > 0) ||
@@ -429,5 +429,7 @@ export function TransactionTable({
     </Card>
   );
 }
+
+    
 
     
