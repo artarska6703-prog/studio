@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Copy, Check, ExternalLink } from 'lucide-react';
 import { shortenAddress } from '@/lib/solana-utils';
 import { useToast } from '@/hooks/use-toast';
-import { WalletDetails, FlattenedTransaction } from '@/lib/types';
+import { WalletDetails, FlattenedTransaction, Transaction } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
@@ -169,9 +169,10 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
             return Object.entries(volumeMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
         }
 
+        const lastTx = sortedTxs[sortedTxs.length - 1];
         return {
             firstTx: sortedTxs[0]?.blockTime ? new Date(sortedTxs[0].blockTime * 1000) : null,
-            lastTx: sortedTxs[sortedTxs.length - 1]?.blockTime ? new Date(sortedTxs[sortedTxs.length - 1].blockTime * 1000) : null,
+            lastTx: lastTx?.blockTime ? new Date(lastTx.blockTime * 1000) : null,
             incomingCount: incoming.length,
             outgoingCount: outgoing.length,
             incomingVolume: aggregateVolume(incoming),
@@ -274,7 +275,5 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         </Sheet>
     );
 }
-
-    
 
     
