@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/utils';
 export interface GraphNode extends Node {
     id: string;
     balance: number;
-    balanceUSD: number;
+    balanceUSD: number | null;
     transactionCount: number;
     type: string;
     notes: string;
@@ -32,7 +32,7 @@ export interface PhysicsState {
   avoidOverlap: number;
 }
 
-const getNodeType = (address: string, balanceUSD: number): string => {
+const getNodeType = (address: string, balanceUSD: number | null): string => {
     const lowerAddress = address.toLowerCase();
     const keywords = {
         exchange: ['binance', 'coinbase', 'kraken', 'ftx', 'kucoin'],
@@ -46,16 +46,20 @@ const getNodeType = (address: string, balanceUSD: number): string => {
         }
     }
 
-    if (balanceUSD > 100000) return 'whale';
-    if (balanceUSD > 50000) return 'shark';
-    if (balanceUSD > 10000) return 'dolphin';
-    if (balanceUSD > 1000) return 'fish';
+    const usd = balanceUSD || 0;
+    if (usd > 100000) return 'whale';
+    if (usd > 50000) return 'shark';
+    if (usd > 10000) return 'dolphin';
+    if (usd > 1000) return 'fish';
     return 'shrimp';
 };
 
-const getMass = (balanceUSD: number) => {
-    const baseMass = Math.log1p(balanceUSD) || 1;
+const getMass = (balance: number, balanceUSD: number | null) => {
+    // Prioritize USD for mass calculation, but fall back to SOL balance if USD is not available.
+    const value = balanceUSD !== null && balanceUSD > 0 ? balanceUSD : balance;
+    const baseMass = Math.log1p(value) || 1;
     const type = getNodeType('', balanceUSD);
+
     if (type === 'exchange' || type === 'platform') return baseMass * 50;
     if (type === 'whale') return baseMass * 10;
     if (type === 'shark') return baseMass * 5;
@@ -63,9 +67,12 @@ const getMass = (balanceUSD: number) => {
     return baseMass;
 }
 
-const getNodeSize = (balanceUSD: number) => {
-    const baseSize = 5 + Math.log1p(balanceUSD);
+const getNodeSize = (balance: number, balanceUSD: number | null) => {
+    // Prioritize USD for size calculation, but fall back to SOL balance if USD is not available.
+    const value = balanceUSD !== null && balanceUSD > 0 ? balanceUSD : balance;
+    const baseSize = 5 + Math.log1p(value);
     const type = getNodeType('', balanceUSD);
+    
     if (type === 'exchange' || type === 'platform') return baseSize * 3.5;
     if (type === 'whale') return baseSize * 2.5;
     if (type === 'shark') return baseSize * 1.5;
@@ -156,8 +163,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
         .map(address => {
             const { txCount } = addressData[address];
             const balance = addressBalances[address] || 0;
-            // Use live solPrice if available, otherwise use a default for graph visualization
-            const balanceUSD = solPrice ? balance * solPrice : balance * 150; 
+            const balanceUSD = solPrice ? balance * solPrice : null; 
             let nodeType = getNodeType(address, balanceUSD);
             let group = nodeType;
             let label = shortenAddress(address, 4);
@@ -179,8 +185,8 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 type: nodeType,
                 notes: '',
                 shape: 'dot',
-                value: getNodeSize(balanceUSD),
-                mass: getMass(balanceUSD),
+                value: getNodeSize(balance, balanceUSD),
+                mass: getMass(balance, balanceUSD),
                 group: group,
                 fixed,
                 x: fixed ? 0 : undefined,

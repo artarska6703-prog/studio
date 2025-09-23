@@ -77,7 +77,9 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
                 <div className="text-right font-mono">{node.balance.toFixed(2)} SOL</div>
                 
                 <div className="text-muted-foreground">Value (USD):</div>
-                <div className="text-right font-mono">{formatCurrency(node.balanceUSD)}</div>
+                <div className="text-right font-mono">
+                    {node.balanceUSD !== null ? formatCurrency(node.balanceUSD) : 'N/A'}
+                </div>
                 
                 <div className="text-muted-foreground">Transactions:</div>
                 <div className="text-right font-mono">{node.transactionCount}</div>
@@ -143,7 +145,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
         const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances, solPrice);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
-            node.balanceUSD >= debouncedMinVolume &&
+            (node.balanceUSD ?? 0) >= debouncedMinVolume &&
             node.transactionCount >= minTransactions &&
             (visibleNodeTypes.includes(node.type) || node.type === 'root')
         );
