@@ -181,7 +181,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 value: getNodeSize(balance),
                 mass: getMass(balance),
                 group: group,
-                fixed: fixed,
+                fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
                 title: `Address: ${address}<br>Balance: ${balance.toFixed(2)} SOL<br>Interaction Volume: ${formatCurrency(interactionVolume)}<br>Transactions: ${txCount}<br>Type: ${nodeType}<br>Hops: ${nodeDepths.get(address) ?? 'N/A'}`,
@@ -207,3 +207,6 @@ export const groupStyles: Options['groups'] = {
     shrimp:   { color: { background: '#388e3c', border: '#2a6b2d' }, font: { color: '#fff' } },
     bridge:   { color: { background: '#546e7a', border: '#445761' }, font: { color: '#fff' } },
 };
+
+
+    
