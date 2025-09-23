@@ -11,7 +11,7 @@ import Loading from '@/app/wallet/[address]/loading';
 import { TokenTable } from '@/components/wallet/token-table';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, LineChart } from 'lucide-react';
+import { Terminal, LineChart, X } from 'lucide-react';
 import { WalletNetworkGraph } from '@/components/wallet/wallet-relationship-graph';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getBalancedTxs, getWhaleTxs, getDegenTxs } from '@/components/wallet/mock-tx-data';
@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PortfolioCompositionChart } from '@/components/wallet/portfolio-composition-chart';
 import type { DateRange } from 'react-day-picker';
+import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 const TXN_PAGE_SIZE = 50;
@@ -318,7 +319,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                             className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8"
                           >
                             <span className="sr-only">Clear date range</span>
-                            &times;
+                            <X className="h-4 w-4" />
                           </Button>
                         }
                       </div>
@@ -345,3 +346,5 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
     </div>
   );
 }
+
+    
