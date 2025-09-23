@@ -70,15 +70,15 @@ export async function GET(
 ) {
     const { address } = params;
 
-    if (!isValidSolanaAddress(address)) {
-        return NextResponse.json({ message: 'Invalid Solana address format.' }, { status: 400 });
-    }
-
     if (!heliusApiKey) {
-        return NextResponse.json({ message: 'Helius API key is not configured.' }, { status: 500 });
+        return NextResponse.json({ message: 'Server configuration error: Helius API key is not configured.' }, { status: 500 });
     }
      if (!rpcEndpoint) {
-        return NextResponse.json({ message: 'RPC endpoint is not configured.' }, { status: 500 });
+        return NextResponse.json({ message: 'Server configuration error: RPC endpoint is not configured.' }, { status: 500 });
+    }
+
+    if (!isValidSolanaAddress(address)) {
+        return NextResponse.json({ message: 'Invalid Solana address format.' }, { status: 400 });
     }
 
     try {
