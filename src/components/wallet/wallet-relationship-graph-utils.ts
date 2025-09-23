@@ -75,46 +75,6 @@ const getNodeSize = (balance: number) => {
     return baseSize;
 }
 
-const createTooltipElement = (data: { [key: string]: string | number | undefined }) => {
-    const tooltip = document.createElement('div');
-    // We must use inline styles as Vis.js tooltips are rendered outside the React tree
-    // and do not inherit Tailwind styles or CSS variables properly.
-    tooltip.style.background = 'hsl(222.2 84% 4.9%)'; // --background from .dark
-    tooltip.style.color = 'hsl(210 40% 98%)'; // --foreground from .dark
-    tooltip.style.border = '1px solid hsl(217.2 32.6% 17.5%)'; // --border from .dark
-    tooltip.style.borderRadius = '0.5rem'; // --radius
-    tooltip.style.padding = '0.5rem'; // p-2
-    tooltip.style.boxShadow = '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)';
-    tooltip.style.maxWidth = '224px'; // max-w-xs
-    tooltip.style.fontSize = '0.75rem'; // text-xs
-
-    let content = `
-        <div style="padding-bottom: 0.5rem; border-bottom: 1px solid hsl(217.2 32.6% 17.5%);">
-            <p style="font-weight: 600; text-transform: capitalize; color: hsl(210 40% 98%);">${data.type || 'Wallet'}</p>
-            <p style="font-family: 'Fira Code', monospace; color: hsl(215 20.2% 65.1%); font-size: 0.75rem;">${shortenAddress(data.address as string, 10)}</p>
-        </div>
-        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; padding-top: 0.5rem;">
-    `;
-    
-    const stats: (keyof typeof data)[] = ['balance', 'interactionVolume', 'transactions', 'hops'];
-
-    for (const key of stats) {
-        const value = data[key];
-         if(value !== undefined) {
-             let formattedKey = key.replace(/([A-Z])/g, ' $1');
-             content += `
-                <div style="color: hsl(215 20.2% 65.1%); text-transform: capitalize;">${formattedKey}</div>
-                <div style="font-weight: 500; font-family: 'Fira Code', monospace; text-align: right; color: hsl(210 40% 98%);">${value}</div>
-            `;
-        }
-    }
-
-    content += '</div>';
-    tooltip.innerHTML = content;
-    return tooltip;
-};
-
-
 export const processTransactions = (transactions: (Transaction | FlattenedTransaction)[], rootAddress: string, maxDepth: number, addressBalances: { [key: string]: number }): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
@@ -211,15 +171,6 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 fixed = true;
             }
 
-            const tooltipData = {
-                address: address,
-                balance: `${balance.toFixed(2)} SOL`,
-                interactionVolume: formatCurrency(interactionVolume),
-                transactions: txCount,
-                type: nodeType,
-                hops: nodeDepths.get(address) ?? 'N/A'
-            };
-
             return {
                 id: address,
                 label: label,
@@ -234,7 +185,6 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                 fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
-                title: createTooltipElement(tooltipData)
             };
         });
 
@@ -257,6 +207,3 @@ export const groupStyles: Options['groups'] = {
     shrimp:   { color: { background: '#388e3c', border: '#2a6b2d' }, font: { color: '#fff' } },
     bridge:   { color: { background: '#546e7a', border: '#445761' }, font: { color: '#fff' } },
 };
-
-
-    

@@ -89,6 +89,10 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
         damping: 0.09,
         avoidOverlap: 0.7,
     });
+    
+    const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+
 
     const handleNodeTypeToggle = (nodeType: string, checked: boolean) => {
         setVisibleNodeTypes(prev => 
@@ -211,9 +215,19 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
         networkInstance.on('click', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
+                
+                // If the node is not the root, open the detail sheet
+                if (nodeId) {
+                     setSelectedNodeAddress(nodeId);
+                     setIsSheetOpen(true);
+                }
+
                 if (nodeId !== walletAddress && onNodeClick) {
                     onNodeClick(nodeId);
                 }
+            } else {
+                // If background is clicked, maybe close sheet or do nothing
+                // setIsSheetOpen(false);
             }
         });
         
@@ -282,6 +296,13 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
                     <GraphLegend />
                 </div>
             </CardContent>
+            {selectedNodeAddress && (
+                <WalletDetailSheet 
+                    address={selectedNodeAddress} 
+                    open={isSheetOpen}
+                    onOpenChange={setIsSheetOpen}
+                />
+            )}
         </Card>
     );
 }
