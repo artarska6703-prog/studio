@@ -1,5 +1,6 @@
+// src/lib/types.ts
 
-import type { EnrichedTransaction, TokenStandard, TransactionType } from "helius-sdk";
+import { EnrichedTransaction, TokenStandard, TransactionType } from "helius-sdk";
 
 export interface TokenHolding {
   mint: string;
@@ -10,6 +11,7 @@ export interface TokenHolding {
   valueUSD: number | null;
   icon?: string | null;
   tokenStandard?: TokenStandard;
+  price?: number;
 }
 
 export type FlattenedTransaction = Omit<EnrichedTransaction, 'type'> & {
@@ -22,7 +24,7 @@ export type FlattenedTransaction = Omit<EnrichedTransaction, 'type'> & {
     by: string | null;
     instruction: TransactionType;
     interactedWith: string[];
-    valueUSD: number | null;
+    valueUSD: number;
     blockTime?: number; // Add blockTime here as well for consistency
 };
 

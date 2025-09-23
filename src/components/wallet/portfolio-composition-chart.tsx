@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo } from 'react';
@@ -135,7 +136,7 @@ export function PortfolioCompositionChart({ walletDetails }: PortfolioCompositio
                         }}
                         formatter={(value, entry) => {
                             const { color, payload } = entry;
-                            const percent = (payload.value / totalValue) * 100;
+                            const percent = totalValue > 0 ? (payload.value / totalValue) * 100 : 0;
                             return (
                                 <span style={{ color: 'hsl(var(--foreground))' }}>
                                     <span className="font-bold">{value}</span>

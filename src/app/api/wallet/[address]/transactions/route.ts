@@ -1,4 +1,4 @@
-
+// src/app/api/wallet/[address]/transactions/route.ts
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
@@ -31,17 +31,15 @@ function processHeliusTransactions(
           t.owner === walletAddress;
         if (!involved) continue;
 
-        // Amount (robust)
-        const amt =
-          isNative
-            ? (t.amount || 0) / LAMPORTS_PER_SOL
-            : (typeof t.tokenAmount === "number"
-                ? t.tokenAmount
-                : (t.amount && t.decimals
-                    ? t.amount / Math.pow(10, t.decimals)
-                    : 0));
+        // amount normalization
+        const amt = isNative
+          ? (t.amount || 0) / LAMPORTS_PER_SOL
+          : (typeof t.tokenAmount === "number"
+              ? t.tokenAmount
+              : (t.amount && t.decimals
+                  ? t.amount / Math.pow(10, t.decimals)
+                  : 0));
 
-        // skip zeros
         if (!amt) continue;
 
         hasRelevant = true;
@@ -55,8 +53,8 @@ function processHeliusTransactions(
           ? "So11111111111111111111111111111111111111112"
           : t.mint;
 
-        const price = prices[mint] ?? 0;            // always number
-        const valueUSD = Math.abs(amt) * price;     // always number
+        const price = prices[mint] ?? 0;
+        const valueUSD = Math.abs(amt) * price;
 
         out.push({
           ...tx,
@@ -95,14 +93,17 @@ function processHeliusTransactions(
         interactedWith: Array.from(
           new Set(tx.instructions?.map((i: any) => i.programId).filter(Boolean))
         ),
-        valueUSD: 0, // never null
+        valueUSD: 0,
       });
     }
   }
   return out;
 }
 
-export async function GET(req: Request, { params }: { params: { address: string } }) {
+export async function GET(
+  req: Request,
+  { params }: { params: { address: string } }
+) {
   if (!HELIUS_API_KEY) {
     return NextResponse.json({ error: "HELIUS_API_KEY missing" }, { status: 500 });
   }
@@ -130,30 +131,27 @@ export async function GET(req: Request, { params }: { params: { address: string 
       return NextResponse.json({ transactions: [], nextCursor: null, addressBalances: {} });
     }
 
-    // Helius parse expects an array of signatures in modern SDKs (or raw txs in older patterns)
     const sigs = signatures.map((s) => s.signature);
     const parsed = await helius.parseTransactions({ transactions: sigs });
     const txs: Transaction[] = Array.isArray(parsed) ? parsed : [];
 
-    // gather all mints for pricing
-    const mints = new Set<string>(["So11111111111111111111111111111111111111112"]);
+    // gather mints for pricing
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    const mints = new Set<string>([SOL_MINT]);
     for (const tx of txs) {
       for (const t of tx.tokenTransfers ?? []) if (t.mint) mints.add(t.mint);
     }
     const prices = await getTokenPrices(Array.from(mints));
-    
-    console.log("[Debug][Transactions] Token prices:", prices);
 
-    // process
     const processed = processHeliusTransactions(txs, address, prices, tokenList);
 
-    // (optional) balances for addresses you interacted with
-    const addrs = new Set<string>();
+    // optional: balances for addresses interacted with (kept for parity)
+    const addrSet = new Set<string>();
     for (const t of processed) {
-      if (t.from) addrs.add(t.from);
-      if (t.to) addrs.add(t.to);
+      if (t.from) addrSet.add(t.from);
+      if (t.to) addrSet.add(t.to);
     }
-    const addrArr = Array.from(addrs);
+    const addrArr = Array.from(addrSet);
     const infos = addrArr.length
       ? await connection.getMultipleAccountsInfo(addrArr.map((a) => new PublicKey(a)))
       : [];

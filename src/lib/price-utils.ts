@@ -1,12 +1,16 @@
+// src/lib/price-utils.ts
 import { loadTokenMap } from "./token-list";
 
-/** Returns { [mint]: number }, price in USD. Unknown tokens => 0 */
+/**
+ * Returns a map of { [mint]: priceUSD }, always numeric (unknown => 0).
+ */
 export async function getTokenPrices(mints: string[]): Promise<Record<string, number>> {
   if (!mints?.length) return {};
   const tokenMap = await loadTokenMap();
 
   const mintToSymbol: Record<string, string> = {};
   const ids: string[] = [];
+
   for (const mint of mints) {
     const sym = tokenMap.get(mint);
     if (sym) {
@@ -33,5 +37,6 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
     const p = sym && data?.data?.[sym]?.price;
     out[mint] = typeof p === "number" ? p : 0;
   }
+
   return out;
 }

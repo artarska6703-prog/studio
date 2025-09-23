@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -264,7 +265,7 @@ export default function WalletPageClient({ address }: WalletPageClientProps) {
                     )}
                     {displayedDetails && <TokenTable tokens={displayedDetails.tokens} className="md:col-span-2" />}
                 </div>
-                <PortfolioCompositionChart walletDetails={displayedDetails} />
+                {displayedDetails && <PortfolioCompositionChart walletDetails={displayedDetails} />}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
                 <TransactionTable 

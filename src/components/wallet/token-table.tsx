@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -9,7 +10,6 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '../ui/skeleton';
 import Image from 'next/image';
 
 interface TokenTableProps {
@@ -47,7 +47,8 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Asset</TableHead>
-                <TableHead>Balance</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Price</TableHead>
                 <TableHead className="text-right">Value (USD)</TableHead>
               </TableRow>
             </TableHeader>
@@ -72,13 +73,16 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
                   <TableCell className="font-code">
                     {token.amount.toLocaleString('en-US', { maximumFractionDigits: 4, })}
                   </TableCell>
+                  <TableCell className="font-code">
+                    {formatCurrency(token.price, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                  </TableCell>
                    <TableCell className="text-right font-code">
-                    {token.valueUSD !== null ? formatCurrency(token.valueUSD) : <span className="text-xs text-muted-foreground">Not available</span>}
+                    {formatCurrency(token.valueUSD ?? 0)}
                   </TableCell>
                 </TableRow>
               )) : (
                 <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
+                    <TableCell colSpan={4} className="h-24 text-center">
                         No tokens found.
                     </TableCell>
                 </TableRow>

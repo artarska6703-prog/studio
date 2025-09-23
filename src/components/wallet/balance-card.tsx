@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 
 interface BalanceCardProps {
   balance: number;
-  balanceUSD: number | null;
+  balanceUSD: number;
   className?: string;
 }
 
@@ -31,11 +32,7 @@ export function BalanceCard({ balance, balanceUSD, className }: BalanceCardProps
           {displayBalance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
           <span className="text-2xl text-muted-foreground ml-2">SOL</span>
         </div>
-        {balanceUSD !== null ? (
-            <p className="text-lg text-muted-foreground mt-2">{formatCurrency(balanceUSD)}</p>
-        ) : (
-            <p className="text-sm text-amber-500 mt-2">Price data not available</p>
-        )}
+        <p className="text-lg text-muted-foreground mt-2">{formatCurrency(balanceUSD)}</p>
       </CardContent>
     </Card>
   );
