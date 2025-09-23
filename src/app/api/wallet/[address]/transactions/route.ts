@@ -4,14 +4,13 @@ import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
 import { getTokenPrices } from "@/lib/price-utils";
-import { getTokenList } from "@/lib/token-list";
-import type { TokenInfo } from "@jup-ag/core";
+import { loadTokenMap } from "@/lib/token-list";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }, tokenList: Map<string, TokenInfo>): FlattenedTransaction[] => {
+const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }, tokenList: Map<string, string>): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
     
@@ -40,7 +39,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                         blockTime: blockTime,
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
-                        symbol: isNative ? 'SOL' : (tokenList.get(mint)?.symbol || mint.slice(0, 4)),
+                        symbol: isNative ? 'SOL' : (tokenList.get(mint) || mint.slice(0, 4)),
                         mint: mint,
                         from: transfer.fromUserAccount,
                         to: transfer.toUserAccount,
@@ -113,7 +112,7 @@ export async function GET(
         limit,
         before
       }),
-      getTokenList()
+      loadTokenMap()
     ]);
     
     if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {

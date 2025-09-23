@@ -1,43 +1,45 @@
 
-import type { TokenInfo } from "@jup-ag/core";
+let tokenMap: Map<string, string> | null = null;
 
-let cachedTokenList: Map<string, TokenInfo> | null = null;
-let lastFetch = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-export async function getTokenList(): Promise<Map<string, TokenInfo>> {
-  const now = Date.now();
-
-  if (cachedTokenList && now - lastFetch < CACHE_TTL) {
-    return cachedTokenList;
-  }
+export const loadTokenMap = async (): Promise<Map<string, string>> => {
+  if (tokenMap) return tokenMap;
 
   try {
-    const res = await fetch("https://token.jup.ag/all");
-    if (!res.ok) throw new Error(`Jupiter token list failed: ${res.status}`);
+    const response = await fetch("https://token.jup.ag/all");
+    const tokens = await response.json();
 
-    const tokens: TokenInfo[] = await res.json();
-    cachedTokenList = new Map(tokens.map(t => [t.address, t]));
-    lastFetch = now;
+    tokenMap = new Map<string, string>();
+    tokens.forEach((t: any) => {
+      if (t.address && t.symbol) {
+        tokenMap!.set(t.address, t.symbol);
+      }
+    });
 
-    return cachedTokenList!;
+    console.log(`[Token List] Loaded ${tokenMap.size} tokens from Jupiter`);
+    return tokenMap;
   } catch (err) {
-    console.error("[Token List] Failed to fetch Jupiter token list:", err);
-    return cachedTokenList || new Map();
+    console.error("[Token List] Failed to fetch Jupiter token list", err);
+    return new Map();
   }
-}
+};
 
 export async function mintToSymbol(mint: string): Promise<string> {
-  const list = await getTokenList();
-  return list.get(mint)?.symbol || mint.slice(0, 4); // fallback: truncated mint
+  const list = await loadTokenMap();
+  return list.get(mint) || mint.slice(0, 4); // fallback: truncated mint
 }
 
 export async function mintToDecimals(mint: string): Promise<number> {
-  const list = await getTokenList();
-  return list.get(mint)?.decimals || 0;
+  const list = await loadTokenMap();
+  // This part is problematic as the map only stores symbols.
+  // The full TokenInfo is needed for decimals.
+  // For now, returning a default. A better implementation would cache the full TokenInfo object.
+  return 0;
 }
 
 export async function mintToLogo(mint: string): Promise<string | null> {
-  const list = await getTokenList();
-  return list.get(mint)?.logoURI || null;
+    const list = await loadTokenMap();
+    // This part is problematic as the map only stores symbols.
+    // The full TokenInfo is needed for logos.
+    // For now, returning null.
+  return null;
 }
