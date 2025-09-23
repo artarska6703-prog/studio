@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -31,6 +32,8 @@ interface TransactionTableProps {
   hasMore: boolean;
   isLoadingMore: boolean;
   totalTransactions: number;
+  dateRange: DateRange | undefined;
+  setDateRange: (date: DateRange | undefined) => void;
 }
 
 const AddressDisplay = ({ address }: { address: string | null }) => {
@@ -115,14 +118,23 @@ const TransactionRowActions = ({ signature }: { signature: string }) => {
     )
 }
 
-export function TransactionTable({ transactions, allTokens, walletAddress, onLoadMore, hasMore, isLoadingMore, totalTransactions }: TransactionTableProps) {
+export function TransactionTable({ 
+    transactions, 
+    allTokens, 
+    walletAddress, 
+    onLoadMore, 
+    hasMore, 
+    isLoadingMore, 
+    totalTransactions,
+    dateRange,
+    setDateRange
+}: TransactionTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [tokenFilter, setTokenFilter] = useState('all');
   const [directionFilter, setDirectionFilter] = useState('all');
   const [minValueFilter, setMinValueFilter] = useState('');
   const debouncedMinValue = useDebounce(minValueFilter, 500);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [fromFilters, setFromFilters] = useState<AddressFilter[]>([]);
   const [toFilters, setToFilters] = useState<AddressFilter[]>([]);
   
@@ -419,5 +431,3 @@ export function TransactionTable({ transactions, allTokens, walletAddress, onLoa
     </Card>
   );
 }
-
-    

@@ -21,6 +21,9 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { PortfolioCompositionChart } from './portfolio-composition-chart';
 import { processTransactions } from './wallet-relationship-graph-utils';
+import type { DateRange } from 'react-day-picker';
+import { DatePickerWithRange } from '../ui/date-picker';
+import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 const TXN_PAGE_SIZE = 50;
 
@@ -39,6 +42,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [useMockData, setUseMockData] = useState(false);
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   
     const fetchMoreTransactions = useCallback(async () => {
         if (!nextSignature || isFetchingMore || useMockData) {
@@ -128,6 +132,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   }
 
   const liveTransactions = useMemo(() => {
+    let allTransactions: (FlattenedTransaction)[] = [];
     if (useMockData) {
         const rawMockTxs = (() => {
              switch (mockScenario) {
@@ -144,16 +149,30 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         const { nodes } = processTransactions(rawMockTxs, address, 5);
         const balances = new Map(nodes.map(n => [n.id, n.balance]));
         
-        return rawMockTxs.map(tx => ({
+        allTransactions = rawMockTxs.map(tx => ({
             ...tx,
             type: tx.amount > 0 ? 'received' : 'sent',
             by: tx.by,
             interactedWith: tx.interactedWith,
             valueUSD: tx.valueUSD ?? (balances.get(tx.to!) || balances.get(tx.from!)) // simplified logic
         }));
+    } else {
+      allTransactions = transactions;
     }
-    return transactions;
-  }, [useMockData, transactions, mockScenario, address]);
+    
+    // Apply date range filter to all transactions
+    if (dateRange?.from) {
+      return allTransactions.filter(tx => 
+        tx.blockTime ? isWithinInterval(new Date(tx.blockTime * 1000), { 
+            start: startOfDay(dateRange.from!), 
+            end: dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from!)
+        }) : true
+      );
+    }
+    
+    return allTransactions;
+
+  }, [useMockData, transactions, mockScenario, address, dateRange]);
 
   if (isLoading && !useMockData) {
       return <Loading />;
@@ -227,6 +246,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     hasMore={useMockData ? false : !!nextSignature}
                     isLoadingMore={isFetchingMore}
                     totalTransactions={liveTransactions.length}
+                    dateRange={dateRange}
+                    setDateRange={setDateRange}
                 />
             </TabsContent>
             <TabsContent value="graph" className="mt-6">
@@ -258,12 +279,16 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     )}
 
                   </div>
-                  <Button asChild variant="outline">
-                    <Link href={`/diagnostic?address=${address}&scenario=${useMockData ? mockScenario : 'real'}`}>
-                      <LineChart className="mr-2 h-4 w-4"/>
-                      View Diagnostics
-                    </Link>
-                  </Button>
+                   <div className="flex items-center gap-2">
+                      <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                      {dateRange && <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)}>Clear</Button>}
+                      <Button asChild variant="outline">
+                        <Link href={`/diagnostic?address=${address}&scenario=${useMockData ? mockScenario : 'real'}`}>
+                          <LineChart className="mr-2 h-4 w-4"/>
+                          View Diagnostics
+                        </Link>
+                      </Button>
+                  </div>
                 </div>
                 <WalletNetworkGraph 
                     key={useMockData ? `mock-${mockScenario}-${address}` : `real-${address}`}
