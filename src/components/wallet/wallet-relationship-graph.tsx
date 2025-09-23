@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -180,7 +179,6 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
                         scaleFactor: 0.5
                     } 
                 },
-                width: 1
             },
             groups: groupStyles,
             interaction: {

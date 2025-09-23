@@ -16,6 +16,7 @@ export interface GraphLink extends Edge {
     from: string;
     to: string;
     value: number;
+    width?: number;
 }
 
 export interface PhysicsState {
@@ -108,6 +109,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
             }
             allLinks[linkId].value += 1; // Increment interaction count
             allLinks[linkId].title = `${allLinks[linkId].value} interactions`;
+            allLinks[linkId].width = Math.log2(allLinks[linkId].value + 1) * 2;
         }
     });
 
