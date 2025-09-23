@@ -141,6 +141,8 @@ export async function GET(req: Request, { params }: { params: { address: string 
       for (const t of tx.tokenTransfers ?? []) if (t.mint) mints.add(t.mint);
     }
     const prices = await getTokenPrices(Array.from(mints));
+    
+    console.log("[Debug][Transactions] Token prices:", prices);
 
     // process
     const processed = processHeliusTransactions(txs, address, prices, tokenList);
