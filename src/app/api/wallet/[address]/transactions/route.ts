@@ -1,76 +1,18 @@
 
-import { Helius, TransactionType, type EnrichedTransaction } from "helius-sdk";
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
-import type { FlattenedTransaction } from "@/lib/types";
-import { unstable_cache } from "next/cache";
-import { Connection, PublicKey } from "@solana/web3.js";
+import type { FlattenedTransaction, Transaction } from "@/lib/types";
 
-const heliusApiKey = process.env.HELIUS_API_KEY;
-const rpcEndpoint = process.env.SYNDICA_RPC_URL;
-const LAMPORTS_PER_SOL = 1_000_000_000;
 
-const getTokenPrices = unstable_cache(
-    async (mints: string[]) => {
-        if (mints.length === 0 || !heliusApiKey) return {};
-        const helius = new Helius(heliusApiKey);
-        try {
-            const prices: { [mint: string]: number } = {};
-            const pricePromises = mints.map(async (mint) => {
-                try {
-                    const asset = await helius.rpc.getAsset(mint);
-                    if (asset?.token_info?.price_info?.price_per_token) {
-                        return { mint, price: asset.token_info.price_info.price_per_token };
-                    }
-                } catch (e) {
-                    console.error(`Failed to fetch price for mint ${mint} from Helius`, e);
-                }
-                return { mint, price: null };
-            });
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
 
-            const results = await Promise.all(pricePromises);
-            
-            for (const result of results) {
-                if (result.price !== null) {
-                    prices[result.mint] = result.price;
-                }
-            }
-            return prices;
-        } catch (error) {
-            console.error("Failed to fetch token prices from Helius:", error);
-            return {};
-        }
-    },
-    ['helius-token-prices'],
-    { revalidate: 60 } // Revalidate every 60 seconds
-);
-
-const getSolanaPrice = unstable_cache(
-    async () => {
-        if (!heliusApiKey) return null;
-        const helius = new Helius(heliusApiKey);
-        try {
-            const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
-            return asset?.token_info?.price_info?.price_per_token ?? null;
-        } catch (error) {
-            console.error("Failed to fetch Solana price from Helius:", error);
-            return null;
-        }
-    },
-    ['helius-solana-price'],
-    { revalidate: 60 }
-);
-
-const processHeliusTransactions = (
-    transactions: EnrichedTransaction[], 
-    walletAddress: string, 
-    solPrice: number | null, 
-    tokenPrices: Record<string, number>
-): FlattenedTransaction[] => {
+const processHeliusTransactions = (transactions: Transaction[], walletAddress: string): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
 
     transactions.forEach(tx => {
-        if (!tx) return;
         let hasRelevantTransfer = false;
         
         const processTransfers = (transfers: any[] | undefined | null, isNative: boolean) => {
@@ -78,27 +20,22 @@ const processHeliusTransactions = (
             transfers.forEach(transfer => {
                 const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress || transfer.owner === walletAddress;
                 
-                if (isOwnerInvolved && (isNative ? transfer.amount > 0 : transfer.tokenAmount > 0)) {
+                if (isOwnerInvolved && transfer.amount > 0) {
                     hasRelevantTransfer = true;
                     
                     const amountRaw = isNative ? transfer.amount / LAMPORTS_PER_SOL : transfer.tokenAmount;
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
-
-                    let valueUSD: number | null = null;
-                    const mint = isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint;
-                    const price = isNative ? solPrice : tokenPrices[mint];
                     
-                    if (price) {
-                        valueUSD = Math.abs(finalAmount) * price;
-                    }
+                    // Crude value calculation, only for SOL. Full token pricing is complex.
+                    const valueUSD = (isNative && tx.events?.nft?.amount) ? (tx.events.nft.amount / LAMPORTS_PER_SOL) * 150 : null;
 
                     flattenedTxs.push({
                         ...tx,
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
-                        symbol: isNative ? 'SOL' : null, 
-                        mint: mint,
+                        symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
+                        mint: isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint,
                         from: transfer.fromUserAccount,
                         to: transfer.toUserAccount,
                         by: tx.feePayer,
@@ -121,16 +58,16 @@ const processHeliusTransactions = (
                 symbol: null,
                 mint: null,
                 from: tx.feePayer,
-                to: tx.accountData?.[0]?.programId || null,
+                to: tx.instructions?.[0]?.programId || null,
                 by: tx.feePayer,
                 instruction: tx.type,
-                interactedWith: Array.from(new Set(tx.accountData?.map(i => i.programId).filter(Boolean) as string[])),
+                interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
                 valueUSD: null,
             });
         }
     });
 
-    return flattenedTxs.sort((a,b) => (b.blockTime || 0) - (a.blockTime || 0));
+    return flattenedTxs;
 }
 
 
@@ -138,45 +75,45 @@ export async function GET(
   req: Request,
   { params }: { params?: { address?: string } }
 ) {
-  if (!heliusApiKey || !rpcEndpoint) {
-    return NextResponse.json({ error: "Server configuration error: API keys or RPC URL is missing." }, { status: 500 });
+  if (!HELIUS_API_KEY) {
+    return NextResponse.json({ error: "Server configuration error: Helius API key is missing." }, { status: 500 });
+  }
+  if (!SYNDICA_RPC_URL) {
+    return NextResponse.json({ error: "Server configuration error: RPC URL is missing." }, { status: 500 });
   }
 
   try {
     if (!params?.address) {
-      return NextResponse.json({ error: "No address provided" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No address provided in route params" },
+        { status: 400 }
+      );
     }
     
-    const helius = new Helius(heliusApiKey);
-    const connection = new Connection(rpcEndpoint, 'confirmed');
+    const helius = new Helius(HELIUS_API_KEY!);
+    const connection = new Connection(SYNDICA_RPC_URL!, "confirmed");
+    
+    const pubkey = new PublicKey(params.address);
 
     const { searchParams } = new URL(req.url);
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
     const before = searchParams.get("before") || undefined;
 
-    const signatures = await connection.getSignaturesForAddress(
-        new PublicKey(params.address), 
-        { limit: 50, before }
-    );
-
-    if (!signatures || signatures.length === 0) {
+    const signatures = await connection.getSignaturesForAddress(pubkey, {
+      limit,
+      before
+    });
+    
+    if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null });
     }
     
-    const transactions = await helius.parser.parseTransaction({
-        transactions: signatures.map(s => s.signature),
-    });
-
-    const allTokenMints = transactions
-      .flatMap(tx => tx.tokenTransfers?.map(t => t.mint) || [])
-      .filter((mint): mint is string => !!mint);
-    const uniqueTokenMints = Array.from(new Set(allTokenMints));
-
-    const [solPrice, tokenPrices] = await Promise.all([
-      getSolanaPrice(),
-      getTokenPrices(uniqueTokenMints)
-    ]);
+    const signatureStrings = signatures.map(s => s.signature);
     
-    const processedTxs = processHeliusTransactions(transactions, params.address, solPrice, tokenPrices);
+    const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
+
+    // Ensure parsedTxs is an array before processing
+    const processedTxs = processHeliusTransactions(parsedTxs || [], params.address);
     
     const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
 
@@ -185,11 +122,10 @@ export async function GET(
       nextCursor,
     });
   } catch (err: any) {
-    console.error("[API TRANSACTIONS] Error fetching transactions:", err);
-    const errorMessage = err?.message || "An unknown error occurred.";
-    if (errorMessage.includes('429')) {
-      return NextResponse.json({ error: 'Rate limited by API. Please try again in a moment.' }, { status: 429 });
-    }
-    return NextResponse.json({ error: `Failed to fetch transactions: ${errorMessage}` }, { status: 500 });
+    console.error("Error fetching wallet transactions:", err);
+    return NextResponse.json(
+      { error: err?.message || "Unknown error", stack: String(err) },
+      { status: 500 }
+    );
   }
 }
