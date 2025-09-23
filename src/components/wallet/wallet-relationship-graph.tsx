@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Transaction } from '@/lib/types';
 import { WalletDetailSheet } from './wallet-detail-sheet';
-import { GraphNode, GraphLink, PhysicsState } from './wallet-relationship-graph-utils';
+import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
@@ -58,7 +58,6 @@ const GraphLegend = () => {
 export interface DiagnosticData {
     nodes: GraphNode[];
     links: GraphLink[];
-    physics: PhysicsState;
 }
 interface WalletNetworkGraphProps {
     walletAddress: string;
@@ -78,18 +77,6 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
     const debouncedMinVolume = useDebounce(minVolume, 500);
     const [minTransactions, setMinTransactions] = useState(1);
     const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(ALL_NODE_TYPES);
-
-    const [physicsState, setPhysicsState] = useState<PhysicsState>({
-        solver: "barnesHut",
-        gravitationalConstant: -8000,
-        centralGravity: 0.1,
-        springLength: 120,
-        springConstant: 0.08,
-        damping: 0.09,
-        avoidOverlap: 0.7,
-    });
-    
-    const debouncedPhysics = useDebounce(physicsState, 200);
 
     const handleNodeTypeToggle = (nodeType: string, checked: boolean) => {
         setVisibleNodeTypes(prev => 
@@ -117,8 +104,8 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
     }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes]);
     
     useEffect(() => {
-        onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });
-    }, [nodes, links, physicsState, onDiagnosticDataUpdate]);
+        onDiagnosticDataUpdate?.({ nodes, links });
+    }, [nodes, links, onDiagnosticDataUpdate]);
     
     useEffect(() => {
         if (!containerRef.current) return;
@@ -133,14 +120,13 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             height: '100%',
             width: '100%',
             physics: {
-                solver: debouncedPhysics.solver as any,
                 barnesHut: {
-                    gravitationalConstant: debouncedPhysics.gravitationalConstant,
-                    centralGravity: debouncedPhysics.centralGravity,
-                    springLength: debouncedPhysics.springLength,
-                    springConstant: debouncedPhysics.springConstant,
-                    damping: debouncedPhysics.damping,
-                    avoidOverlap: debouncedPhysics.avoidOverlap,
+                    gravitationalConstant: -8000,
+                    centralGravity: 0.1,
+                    springLength: 120,
+                    springConstant: 0.08,
+                    damping: 0.09,
+                    avoidOverlap: 0.7,
                 },
                 stabilization: {
                   enabled: true,
@@ -236,7 +222,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
             networkInstance.destroy();
         };
 
-    }, [nodes, links, debouncedPhysics]);
+    }, [nodes, links]);
     
     useEffect(() => {
         if (!isSheetOpen) {
@@ -264,24 +250,6 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], onDiagnos
                                 <div>
                                     <Label className="text-sm">Max Depth: {maxDepth}</Label>
                                     <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={5} step={1} />
-                                </div>
-                            </div>
-                        </div>
-                        <Separator />
-                         <div>
-                            <h4 className="font-semibold mb-4 text-foreground">Physics Controls</h4>
-                            <div className="space-y-4">
-                                 <div>
-                                    <Label className="text-sm">Gravity: {-physicsState.gravitationalConstant}</Label>
-                                    <Slider value={[-physicsState.gravitationalConstant]} onValueChange={(v) => setPhysicsState(p => ({...p, gravitationalConstant: -v[0]}))} min={0} max={20000} step={1000}/>
-                                </div>
-                                <div>
-                                    <Label className="text-sm">Spring Length: {physicsState.springLength}</Label>
-                                    <Slider value={[physicsState.springLength]} onValueChange={(v) => setPhysicsState(p => ({...p, springLength: v[0]}))} min={50} max={500} step={10}/>
-                                </div>
-                                <div>
-                                    <Label className="text-sm">Spring Strength: {physicsState.springConstant}</Label>
-                                    <Slider value={[physicsState.springConstant]} onValueChange={(v) => setPhysicsState(p => ({...p, springConstant: v[0]}))} min={0.01} max={0.5} step={0.01}/>
                                 </div>
                             </div>
                         </div>
