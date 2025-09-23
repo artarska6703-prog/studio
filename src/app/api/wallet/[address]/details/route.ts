@@ -47,10 +47,10 @@ export async function GET(
         }
         
         const tokenPrices = await getTokenPrices(Array.from(tokenMints));
-        const solPrice = tokenPrices['So11111111111111111111111111111111111111112'] || null;
+        const solPrice = tokenPrices['So11111111111111111111111111111111111111112'] || 0;
         
         const balance = solBalanceLamports / LAMPORTS_PER_SOL;
-        const balanceUSD = solPrice ? balance * solPrice : null;
+        const balanceUSD = balance * solPrice;
 
         let tokens: TokenHolding[] = [];
         if (assets && assets.items) {

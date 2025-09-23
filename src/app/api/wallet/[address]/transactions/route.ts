@@ -37,10 +37,14 @@ const processHeliusTransactions = (
 
         if (isOwnerInvolved && (transfer.amount > 0 || transfer.tokenAmount > 0)) {
           hasRelevantTransfer = true;
-
+          
           const amountRaw = isNative
             ? transfer.amount / LAMPORTS_PER_SOL
-            : transfer.tokenAmount;
+            : (
+                typeof transfer.tokenAmount === "number"
+                  ? transfer.tokenAmount
+                  : 0
+              );
 
           const sign =
             transfer.fromUserAccount === walletAddress ||
