@@ -31,7 +31,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
 
                     flattenedTxs.push({
                         ...tx,
-                        blockTime: tx.blockTime, // Make sure blockTime is included
+                        blockTime: tx.timestamp || tx.blockTime, // Use timestamp from Helius response
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
                         symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
@@ -53,7 +53,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
         if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
             flattenedTxs.push({
                 ...tx,
-                blockTime: tx.blockTime, // Add this line here too
+                blockTime: tx.timestamp || tx.blockTime, // Also apply fix here
                 type: 'program_interaction',
                 amount: 0,
                 symbol: null,
