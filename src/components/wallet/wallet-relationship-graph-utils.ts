@@ -79,21 +79,21 @@ const createTooltipElement = (data: { [key: string]: string | number | undefined
     const tooltip = document.createElement('div');
     // We must use inline styles as Vis.js tooltips are rendered outside the React tree
     // and do not inherit Tailwind styles or CSS variables properly.
-    tooltip.style.background = 'hsl(222.2 84% 4.9%)'; // --popover
-    tooltip.style.color = 'hsl(210 40% 98%)'; // --popover-foreground
-    tooltip.style.border = '1px solid hsl(217.2 32.6% 17.5%)'; // --border
-    tooltip.style.borderRadius = 'var(--radius)';
-    tooltip.style.padding = '0.25rem'; // p-1
+    tooltip.style.background = 'hsl(222.2 84% 4.9%)'; // --background from .dark
+    tooltip.style.color = 'hsl(210 40% 98%)'; // --foreground from .dark
+    tooltip.style.border = '1px solid hsl(217.2 32.6% 17.5%)'; // --border from .dark
+    tooltip.style.borderRadius = '0.5rem'; // --radius
+    tooltip.style.padding = '0.5rem'; // p-2
     tooltip.style.boxShadow = '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)';
     tooltip.style.maxWidth = '224px'; // max-w-xs
     tooltip.style.fontSize = '0.75rem'; // text-xs
 
     let content = `
-        <div style="padding: 0.25rem 0.5rem; border-bottom: 1px solid hsl(217.2 32.6% 17.5%);">
-            <p style="font-weight: bold; text-transform: capitalize;">${data.type || 'Wallet'}</p>
+        <div style="padding-bottom: 0.5rem; border-bottom: 1px solid hsl(217.2 32.6% 17.5%);">
+            <p style="font-weight: 600; text-transform: capitalize; color: hsl(210 40% 98%);">${data.type || 'Wallet'}</p>
             <p style="font-family: 'Fira Code', monospace; color: hsl(215 20.2% 65.1%); font-size: 0.75rem;">${shortenAddress(data.address as string, 10)}</p>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; padding: 0.5rem;">
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; padding-top: 0.5rem;">
     `;
     
     const stats: (keyof typeof data)[] = ['balance', 'interactionVolume', 'transactions', 'hops'];
@@ -103,8 +103,8 @@ const createTooltipElement = (data: { [key: string]: string | number | undefined
          if(value !== undefined) {
              let formattedKey = key.replace(/([A-Z])/g, ' $1');
              content += `
-                <div style="color: hsl(215 20.2% 65.1%); text-transform: capitalize;">${formattedKey}:</div>
-                <div style="font-weight: 500; font-family: 'Fira Code', monospace; text-align: right;">${value}</div>
+                <div style="color: hsl(215 20.2% 65.1%); text-transform: capitalize;">${formattedKey}</div>
+                <div style="font-weight: 500; font-family: 'Fira Code', monospace; text-align: right; color: hsl(210 40% 98%);">${value}</div>
             `;
         }
     }
