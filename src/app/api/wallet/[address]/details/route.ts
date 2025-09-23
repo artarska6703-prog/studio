@@ -40,7 +40,7 @@ export async function GET(
 
         if (assets && assets.items) {
             assets.items.forEach(asset => {
-                 if (asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance && asset.token_info.balance > 0) {
+                 if (asset.interface === 'FungibleToken' && asset.id && asset.token_info?.balance && asset.token_info.balance > 0) {
                      tokenMints.add(asset.id);
                  }
             });
@@ -58,8 +58,8 @@ export async function GET(
                 .filter(asset => asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance)
                 .map(asset => {
                     const amount = asset.token_info.balance / (10 ** asset.token_info.decimals);
-                    const price = tokenPrices[asset.id];
-                    const valueUSD = price ? amount * price : null;
+                    const price = tokenPrices[asset.id] ?? 0;
+                    const valueUSD = amount * price;
 
                     return {
                         mint: asset.id,
