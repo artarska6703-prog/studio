@@ -2,11 +2,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LAMPORTS_PER_SOL, PublicKey, Connection } from '@solana/web3.js';
 import type { TokenHolding, WalletDetails } from '@/lib/types';
-import { isValidSolanaAddress, getTokenPrices, getSolanaPrice } from '@/lib/solana-utils';
+import { isValidSolanaAddress } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
 const rpcEndpoint = process.env.SYNDICA_RPC_URL;
+
+const getSolanaPrice = async () => {
+    if (!heliusApiKey) return null;
+    try {
+        const helius = new Helius(heliusApiKey);
+        const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
+        return asset?.token_info?.price_info?.price_per_token ?? null;
+    } catch (error) {
+        console.error("Failed to fetch Solana price from Helius:", error);
+        return null;
+    }
+};
+
+const getTokenPrices = async (mints: string[]) => {
+    if (mints.length === 0 || !heliusApiKey) return {};
+    try {
+        const helius = new Helius(heliusApiKey);
+        const prices: { [mint: string]: number } = {};
+        
+        const batchSize = 100;
+        for (let i = 0; i < mints.length; i += batchSize) {
+            const batchMints = mints.slice(i, i + batchSize);
+            if (batchMints.length > 0) {
+              const priceData = await helius.rpc.getPriorityFeeEstimate({
+                // @ts-ignore
+                account: batchMints
+              });
+              if(priceData.token_data) {
+                for (const token of priceData.token_data) {
+                  prices[token.mint] = token.price
+                }
+              }
+            }
+        }
+        
+        return prices;
+
+    } catch (error) {
+        console.error("Failed to fetch token prices from Helius:", error);
+        return {};
+    }
+};
 
 export async function GET(
     request: NextRequest,

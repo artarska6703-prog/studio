@@ -3,11 +3,22 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
-import { getSolanaPrice } from "@/lib/solana-utils";
 
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SYNDICA_RPC_URL = process.env.SYNDICA_RPC_URL;
+
+const getSolanaPrice = async () => {
+    if (!HELIUS_API_KEY) return null;
+    try {
+        const helius = new Helius(HELIUS_API_KEY);
+        const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
+        return asset?.token_info?.price_info?.price_per_token ?? null;
+    } catch (error) {
+        console.error("Failed to fetch Solana price from Helius:", error);
+        return null;
+    }
+};
 
 const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, solPrice: number | null): FlattenedTransaction[] => {
     const flattenedTxs: FlattenedTransaction[] = [];
