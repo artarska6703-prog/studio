@@ -29,41 +29,31 @@ const getTokenPrices = async (mints: string[]) => {
 };
 
 
-const getSolanaPrice = async (): Promise<number> => {
-    if (!HELIUS_API_KEY) return 150; // Fallback if no API key
+const getSolanaPrice = async (): Promise<number | null> => {
+    if (!HELIUS_API_KEY) return null;
     try {
-        // First, try Helius
         const helius = new Helius(HELIUS_API_KEY);
         const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
         const heliusPrice = asset?.token_info?.price_info?.price_per_token;
-
         if (heliusPrice) {
             return heliusPrice;
         }
+    } catch (e) {
+        console.error("Helius SOL price fetch failed, trying Jupiter.", e);
+    }
 
-        // Fallback to Jupiter if Helius fails
+    try {
         const jupiterResponse = await fetch('https://price.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
         if (jupiterResponse.ok) {
             const jupiterData = await jupiterResponse.json();
-            const jupiterPrice = jupiterData.data['So11111111111111111111111111111111111111112']?.price;
+            const jupiterPrice = jupiterData.data['So1111111111111111111111111111111111111111112']?.price;
             if (jupiterPrice) return jupiterPrice;
         }
-        
-        return 150; // Final fallback
-    } catch (error) {
-        console.error("Failed to fetch SOL price, falling back to Jupiter or default", error);
-         try {
-            const jupiterResponse = await fetch('https://price.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
-            if (jupiterResponse.ok) {
-                const jupiterData = await jupiterResponse.json();
-                const jupiterPrice = jupiterData.data['So11111111111111111111111111111111111111112']?.price;
-                if (jupiterPrice) return jupiterPrice;
-            }
-        } catch (e) {
-             console.error("Fallback to Jupiter also failed", e);
-        }
-        return 150; // Final fallback
+    } catch (e) {
+         console.error("Fallback to Jupiter for SOL price failed.", e);
     }
+    
+    return null;
 };
 
 const processHeliusTransactions = (transactions: Transaction[], walletAddress: string, prices: { [mint: string]: number }): FlattenedTransaction[] => {
