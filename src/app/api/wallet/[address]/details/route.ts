@@ -1,3 +1,4 @@
+
 // src/app/api/wallet/[address]/details/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { LAMPORTS_PER_SOL, PublicKey, Connection } from "@solana/web3.js";
@@ -76,6 +77,9 @@ export async function GET(
           tokenStandard: a.token_info?.token_program as any,
         };
       });
+
+    console.log("🔍 Prices:", prices);
+    console.log("💰 Tokens:", tokens);
 
     const body: WalletDetails = {
       address,
