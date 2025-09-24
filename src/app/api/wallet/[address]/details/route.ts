@@ -6,8 +6,8 @@ import { isValidSolanaAddress } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
 import { getTokenPrices } from '@/lib/price-utils';
 
-const heliusApiKey = "9e385df8-c8d3-4916-9615-3c9320ca87ff";
-const rpcEndpoint = "https://solana-mainnet.api.syndica.io/api-key/4kc7afJfAHBE2BvjRPSNR8RcdcJxSEtc6oMqaDnEDzX8Mx5zYZRFXT67dHLmJNqcccdW817WZaM4edyHNqLp8839nq3W9DRaay6";
+const heliusApiKey = process.env.HELIUS_API_KEY;
+const rpcEndpoint = process.env.SYNDICA_RPC_URL;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 
@@ -16,6 +16,10 @@ export async function GET(
     { params }: { params: { address: string } }
 ) {
     const { address } = params;
+
+    if (!heliusApiKey || !rpcEndpoint) {
+        return NextResponse.json({ message: 'Server configuration error: API keys are missing.' }, { status: 500 });
+    }
 
     if (!isValidSolanaAddress(address)) {
         return NextResponse.json({ message: 'Invalid Solana address format.' }, { status: 400 });
