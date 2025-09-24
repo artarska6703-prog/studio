@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
 import { getTokenPrices } from "@/lib/price-utils";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
+import { Connection, PublicKey } from "@solana/web3.js";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 const processHeliusTransactions = async (transactions: Transaction[], walletAddress: string): Promise<FlattenedTransaction[]> => {
@@ -95,8 +97,8 @@ export async function GET(
   req: Request,
   { params }: { params?: { address?: string } }
 ) {
-  if (!HELIUS_API_KEY) {
-    return NextResponse.json({ error: "Server configuration error: Helius API key is missing." }, { status: 500 });
+  if (!HELIUS_API_KEY || !RPC_ENDPOINT) {
+    return NextResponse.json({ error: "Server configuration error: API keys are missing." }, { status: 500 });
   }
 
   try {
@@ -108,24 +110,28 @@ export async function GET(
     }
     
     const helius = createHelius({ apiKey: HELIUS_API_KEY });
+    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
+    const publicKey = new PublicKey(params.address);
 
-    const response = await helius.getTransactions({ 
-        address: params.address,
+    const signatureInfo = await connection.getSignaturesForAddress(publicKey, { 
         limit: 100,
         before,
     });
     
-    if (!response || response.length === 0) {
+    if (!signatureInfo || signatureInfo.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null });
     }
+
+    const signatureStrings = signatureInfo.map(sig => sig.signature);
+    const response = await helius.parseTransactions({ transactions: signatureStrings });
     
     const parsedTxs = response.map(tx => tx as unknown as Transaction);
 
     const processedTxs = await processHeliusTransactions(parsedTxs, params.address);
     
-    const nextCursor = response.length > 0 ? response[response.length - 1]?.signature : null;
+    const nextCursor = signatureInfo.length > 0 ? signatureInfo[signatureInfo.length - 1]?.signature : null;
 
     return NextResponse.json({
       transactions: processedTxs,
