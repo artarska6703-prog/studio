@@ -1,9 +1,9 @@
-
 // src/lib/price-utils.ts
 import { loadTokenMap } from "./token-list";
 
 const JUP_PRICE_URL = "https://quote-api.jup.ag/v6/price";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
+const COINGECKO_SOL = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd";
 
 export async function getTokenPrices(mints: string[]): Promise<Record<string, number>> {
   if (!mints?.length) return {};
@@ -44,13 +44,13 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
     out[mint] = typeof p === "number" ? p : 0;
   }
 
-  // Hard fallback for SOL if still zero (network hiccup or mapping miss)
+  // Hard fallback for SOL
   if ((uniqueMints.includes(SOL_MINT)) && out[SOL_MINT] === 0) {
     try {
-      const res = await fetch(`${JUP_PRICE_URL}?ids=SOL`, { headers: { Accept: "application/json" } });
+      const res = await fetch(COINGECKO_SOL, { headers: { Accept: "application/json" } });
       if (res.ok) {
         const json = await res.json();
-        const p = json?.data?.SOL?.price;
+        const p = json?.solana?.usd;
         if (typeof p === "number") out[SOL_MINT] = p;
       }
     } catch (e) {

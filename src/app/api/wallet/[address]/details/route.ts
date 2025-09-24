@@ -54,6 +54,8 @@ export async function GET(
     }
 
     const prices = await getTokenPrices(mints);
+    console.log("✅ [API DETAILS] Fetched prices object:", prices);
+
     const solPrice = prices[SOL_MINT] ?? 0;
     const solValueUSD = solAmount * solPrice;
 
@@ -78,18 +80,14 @@ export async function GET(
         };
       });
 
-    console.log("🔍 Prices:", prices);
-    console.log("💰 Tokens:", tokens);
+    console.log("✅ [API DETAILS] Final token response:", tokens.map(t => ({ symbol: t.symbol, value: t.valueUSD })));
+    console.log("✅ [API DETAILS] Final SOL value:", { solAmount, solPrice, solValueUSD });
 
     const body: WalletDetails = {
       address,
       sol: { balance: solAmount, price: solPrice, valueUSD: solValueUSD },
       tokens,
     };
-
-    console.log("✅ [API] Prices object:", prices);
-    console.log("✅ [API] Token response:", tokens);
-    console.log("✅ [API] SOL:", solAmount, solPrice, solValueUSD);
 
     return NextResponse.json(body);
   } catch (error: any) {

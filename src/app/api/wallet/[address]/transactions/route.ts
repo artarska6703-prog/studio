@@ -123,6 +123,8 @@ export async function GET(
     for (const tx of txs) for (const t of tx.tokenTransfers ?? []) if (t.mint) mints.add(t.mint);
 
     const prices = await getTokenPrices(Array.from(mints));
+    console.log("✅ [API TRANSACTIONS] Fetched prices object:", prices);
+
     const flattened = toFlattened(txs, address, prices, tokenMap);
     const nextCursor = sigInfo[sigInfo.length - 1]?.signature || null;
 

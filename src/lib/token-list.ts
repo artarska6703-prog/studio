@@ -8,6 +8,9 @@ const SOL_MINT  = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
 
+// Use the smaller token list (safe for Next.js / Firebase Studio)
+const TOKEN_LIST_URL = "https://tokens.jup.ag/tokens";
+
 function ensureCritical(map: Map<string, string>) {
   map.set(SOL_MINT, "SOL");
   map.set(USDC_MINT, "USDC");
@@ -22,7 +25,7 @@ export async function loadTokenMap(): Promise<Map<string, string>> {
   }
 
   try {
-    const res = await fetch("https://token.jup.ag/all", { headers: { Accept: "application/json" } });
+    const res = await fetch(TOKEN_LIST_URL, { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(`Token list failed: ${res.status}`);
     const tokens = await res.json();
     cached = new Map(tokens.map((t: any) => [t.address, t.symbol]));
