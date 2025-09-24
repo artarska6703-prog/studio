@@ -35,7 +35,6 @@ type WalletPageViewProps = {
 
 export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
-  const [addressBalances, setAddressBalances] = useState<{ [key: string]: number }>({});
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,8 +61,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             const newTxs = data.transactions.filter((tx: FlattenedTransaction) => !existingSigs.has(tx.signature));
             return [...prev, ...newTxs];
         });
-
-        setAddressBalances(prev => ({...prev, ...data.addressBalances}));
         setNextSignature(data.nextCursor);
 
     } catch (e: any) {
@@ -122,10 +119,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     return allTransactions;
   }, [useMockData, allTransactions, mockScenario, address]);
   
-  const solPrice = useMemo(() => {
-    if (!walletDetails) return 0;
-    return walletDetails.sol.price;
-  }, [walletDetails]);
 
   const filteredTransactions = useMemo(() => {
     if (!dateRange || !dateRange.from) return liveTransactions;
@@ -274,12 +267,10 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                   </div>
                 </div>
                 <WalletNetworkGraph 
-                    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${solPrice}`}
+                    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${walletDetails?.sol.price}`}
                     walletAddress={address}
                     transactions={liveTransactions}
-                    addressBalances={addressBalances}
-                    solPrice={solPrice}
-                    onNodeClick={() => { /* Expansion handled by load more now */}}
+                    solPrice={walletDetails?.sol.price || 0}
                 />
             </TabsContent>
         </Tabs>

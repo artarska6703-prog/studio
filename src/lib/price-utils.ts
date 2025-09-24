@@ -11,18 +11,17 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   const tokenMap = await loadTokenMap();
 
   const mintToSymbol: Record<string, string> = {};
-  const idsForApi: string[] = []; // This will be the list of unique symbols for the API
+  const symbolsForApi = new Set<string>();
 
   for (const mint of uniqueMints) {
     const symbol = tokenMap.get(mint);
     if (symbol) {
       mintToSymbol[mint] = symbol;
-      if (!idsForApi.includes(symbol)) {
-        idsForApi.push(symbol);
-      }
+      symbolsForApi.add(symbol);
     }
   }
-
+  
+  const idsForApi = Array.from(symbolsForApi);
   let priceData: any = {};
   if (idsForApi.length > 0) {
     try {

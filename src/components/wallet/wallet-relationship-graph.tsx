@@ -100,10 +100,8 @@ export interface DiagnosticData {
 interface WalletNetworkGraphProps {
     walletAddress: string;
     transactions: Transaction[];
-    addressBalances: { [key: string]: number };
     solPrice: number | null;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
-    onNodeClick?: (address: string) => void;
 }
 
 const ALL_NODE_TYPES = legendItems.map(item => item.key);
@@ -180,7 +178,7 @@ const PhysicsControls = ({ physicsState, setPhysicsState }: { physicsState: Phys
     )
 }
 
-export function WalletNetworkGraph({ walletAddress, transactions = [], addressBalances, solPrice, onDiagnosticDataUpdate, onNodeClick }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     
@@ -217,6 +215,21 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             return { nodes: [], links: [] };
         }
         
+        // The addressBalances and solPrice are now derived from the transaction stream,
+        // but we need to compute them for the graph processing.
+        // This is a temporary measure. Ideally, the parent component would provide a unified balance view.
+        const addressBalances: { [key: string]: number } = {};
+        transactions.forEach(tx => {
+            if (tx.from && tx.amount < 0) {
+                if (!addressBalances[tx.from]) addressBalances[tx.from] = 0;
+                // This is not accurate for balance, just for graph sizing
+            }
+             if (tx.to && tx.amount > 0) {
+                if (!addressBalances[tx.to]) addressBalances[tx.to] = 0;
+            }
+        });
+
+
         const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances, solPrice);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
@@ -229,7 +242,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
         const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
-    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, addressBalances, solPrice]);
+    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, solPrice]);
     
     useEffect(() => {
         onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });
@@ -333,9 +346,6 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
                      setIsSheetOpen(true);
                 }
 
-                if (nodeId !== walletAddress && onNodeClick) {
-                    onNodeClick(nodeId);
-                }
             }
         });
         
@@ -377,7 +387,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], addressBa
             networkInstance.destroy();
         };
 
-    }, [nodes, links, physicsState, onNodeClick, walletAddress, router]);
+    }, [nodes, links, physicsState, walletAddress, router]);
 
     return (
         <Card className="bg-transparent border-0 shadow-none">

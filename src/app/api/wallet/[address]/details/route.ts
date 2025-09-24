@@ -78,7 +78,7 @@ export async function GET(
                         tokenStandard: asset.token_info?.token_program as any,
                     };
                 })
-                .filter(token => token.amount > 0 && token.valueUSD > 0.01);
+                .filter(token => token.amount > 0);
         }
 
         const walletDetails: WalletDetails = { 
