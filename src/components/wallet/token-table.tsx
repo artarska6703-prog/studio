@@ -70,6 +70,7 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
                     {token.amount.toLocaleString('en-US', { maximumFractionDigits: 4, })}
                   </TableCell>
                    <TableCell className="text-right font-code">
+                    {console.log("Token valueUSD raw:", token.valueUSD, "for mint", token.mint)}
                     {formatCurrency(token.valueUSD)}
                   </TableCell>
                 </TableRow>

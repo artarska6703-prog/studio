@@ -333,6 +333,7 @@ export function TransactionTable({
                         {tx.type !== 'program_interaction' && (isOut ? '-' : '+')}{formatAmount(tx)}
                     </TableCell>
                     <TableCell className="text-right font-code text-muted-foreground">
+                        {console.log("Tx valueUSD raw:", tx.valueUSD, "for signature", tx.signature)}
                         {formatCurrency(Math.abs(tx.valueUSD))}
                     </TableCell>
                     <TableCell className="text-right font-code font-bold">
