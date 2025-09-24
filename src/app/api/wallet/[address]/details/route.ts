@@ -62,19 +62,19 @@ export async function GET(
              tokens = assets.items
                 .filter(asset => asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance)
                 .map(asset => {
-                    const amount = asset.token_info.balance / (10 ** asset.token_info.decimals);
+                    const amount = (asset.token_info?.balance ?? 0) / (10 ** (asset.token_info?.decimals ?? 0));
                     const price = prices[asset.id] ?? 0;
                     const valueUSD = amount * price;
 
                     return {
                         mint: asset.id,
-                        name: asset.content.metadata.name || 'Unknown Token',
-                        symbol: asset.content.metadata.symbol || '???',
+                        name: asset.content?.metadata?.name || 'Unknown Token',
+                        symbol: asset.content?.metadata?.symbol || '???',
                         amount: amount,
-                        decimals: asset.token_info.decimals,
+                        decimals: asset.token_info?.decimals ?? 0,
                         valueUSD: valueUSD,
-                        icon: asset.content.files?.[0]?.uri,
-                        tokenStandard: asset.token_info.token_program as any,
+                        icon: asset.content?.files?.[0]?.uri,
+                        tokenStandard: asset.token_info?.token_program as any,
                     };
                 })
                 .filter(token => token.amount > 0 && token.valueUSD > 0.01);
