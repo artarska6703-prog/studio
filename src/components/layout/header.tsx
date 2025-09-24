@@ -10,7 +10,7 @@ export function Header() {
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <SolanaLogo className="h-6 w-6" />
             <span className="font-bold sm:inline-block font-headline">
-              SolViz
+              SolViz <span className="text-xs text-muted-foreground font-light">v2</span>
             </span>
           </Link>
         </div>
