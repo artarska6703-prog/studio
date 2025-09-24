@@ -40,7 +40,7 @@ export async function GET(
             }
         }
         
-        const assets = await helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 });
+        const assets = await helius.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 });
         
         const tokenMints = [SOL_MINT]; 
         if (assets && assets.items) {
