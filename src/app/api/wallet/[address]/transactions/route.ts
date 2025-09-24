@@ -12,7 +12,6 @@ const processHeliusTransactions = async (transactions: Transaction[], walletAddr
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
     
-    // 1. Collect all unique mints from all transfers
     const mints = new Set<string>([SOL_MINT]);
     transactions.forEach(tx => {
         tx.tokenTransfers?.forEach(t => {
@@ -20,10 +19,8 @@ const processHeliusTransactions = async (transactions: Transaction[], walletAddr
         });
     });
 
-    // 2. Fetch prices for all collected mints in one go
     const prices = await getTokenPrices(Array.from(mints));
 
-    // 3. Process each transaction with the fetched prices
     transactions.forEach(tx => {
         let hasRelevantTransfer = false;
         
@@ -53,14 +50,14 @@ const processHeliusTransactions = async (transactions: Transaction[], walletAddr
                         instructions: tx.instructions,
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
-                        symbol: null, // Symbol will be resolved on the frontend
+                        symbol: null, 
                         mint: mint,
                         from: transfer.fromUserAccount,
                         to: transfer.toUserAccount,
                         by: tx.feePayer,
-                        instruction: tx.type, // Helius type like 'TRANSFER' or 'SWAP'
+                        instruction: tx.type,
                         interactedWith: Array.from(new Set([tx.feePayer, transfer.fromUserAccount, transfer.toUserAccount].filter(a => a && a !== walletAddress) as string[])),
-                        valueUSD: valueUSD, // Always a number
+                        valueUSD: valueUSD,
                     });
                 }
             });
@@ -69,7 +66,6 @@ const processHeliusTransactions = async (transactions: Transaction[], walletAddr
         processTransfers(tx.nativeTransfers, true);
         processTransfers(tx.tokenTransfers, false);
 
-        // Handle interactions that aren't simple transfers (e.g., contract interaction with no fund movement)
         if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
             flattenedTxs.push({
                 signature: tx.signature,
@@ -115,9 +111,9 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
 
-    const response = await helius.rpc.getTransactions({ 
+    const response = await helius.getTransactions({ 
         address: params.address,
-        limit: 100, // Helius specific limit
+        limit: 100,
         before,
     });
     
