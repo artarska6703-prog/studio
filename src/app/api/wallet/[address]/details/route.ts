@@ -87,6 +87,10 @@ export async function GET(
       tokens,
     };
 
+    console.log("✅ [API] Prices object:", prices);
+    console.log("✅ [API] Token response:", tokens);
+    console.log("✅ [API] SOL:", solAmount, solPrice, solValueUSD);
+
     return NextResponse.json(body);
   } catch (error: any) {
     console.error(`[API WALLET DETAILS] Failed for ${params.address}:`, error);
