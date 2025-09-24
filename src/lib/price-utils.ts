@@ -25,7 +25,7 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   if (symbols.size > 0) {
     try {
       const url = `${JUP_PRICE_URL}?ids=${Array.from(symbols).join(",")}`;
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         data = json?.data || {};
@@ -47,7 +47,7 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   // Hard fallback for SOL
   if ((uniqueMints.includes(SOL_MINT)) && out[SOL_MINT] === 0) {
     try {
-      const res = await fetch(COINGECKO_SOL, { headers: { Accept: "application/json" } });
+      const res = await fetch(COINGECKO_SOL, { headers: { Accept: "application/json" }, cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         const p = json?.solana?.usd;

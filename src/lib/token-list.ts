@@ -1,9 +1,9 @@
 // src/lib/token-list.ts
 let cached: Map<string, string> | null = null;
 let lastFetch = 0;
-const TTL = 5 * 60 * 1000;
+const TTL = 5 * 60 * 1000; // 5 minutes
 
-// Critical mints on Solana
+// Critical mints
 const SOL_MINT  = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
@@ -25,7 +25,10 @@ export async function loadTokenMap(): Promise<Map<string, string>> {
   }
 
   try {
-    const res = await fetch(TOKEN_LIST_URL, { headers: { Accept: "application/json" } });
+    const res = await fetch(TOKEN_LIST_URL, { 
+        headers: { Accept: "application/json" },
+        cache: "no-store"
+    });
     if (!res.ok) throw new Error(`Token list failed: ${res.status}`);
     const tokens = await res.json();
     cached = new Map(tokens.map((t: any) => [t.address, t.symbol]));
