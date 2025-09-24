@@ -1,7 +1,8 @@
+
 // src/lib/price-utils.ts
 import { loadTokenMap } from "./token-list";
 
-const JUP_PRICE_URL = "https://price.jup.ag/v6/price";
+const JUP_PRICE_URL = "https://quote-api.jup.ag/v6/price";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export async function getTokenPrices(mints: string[]): Promise<Record<string, number>> {
