@@ -122,7 +122,7 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
                         disabled={page === totalPages || totalPages === 0}
                         className="h-8 w-8 p-0"
                     >
-                        <span className="sr-only">Go to next page</span>
+                        <span className="sr-only">Next page</span>
                         <ChevronRight className="h-4 w-4" />
                     </Button>
                 </div>
