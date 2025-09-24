@@ -24,7 +24,6 @@ import { PortfolioCompositionChart } from '@/components/wallet/portfolio-composi
 import type { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import TransactionsPageClient from './transactions-page-client';
 
 const TXN_PAGE_SIZE = 100;
 
@@ -36,7 +35,6 @@ type WalletPageViewProps = {
 
 export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
-  const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
   const [addressBalances, setAddressBalances] = useState<{ [key: string]: number }>({});
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [nextSignature, setNextSignature] = useState<string | null>(null);
@@ -61,7 +59,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         
         setAllTransactions(prev => {
             const existingSigs = new Set(prev.map(t => t.signature));
-            const newTxs = data.transactions.filter((tx: Transaction) => !existingSigs.has(tx.signature));
+            const newTxs = data.transactions.filter((tx: FlattenedTransaction) => !existingSigs.has(tx.signature));
             return [...prev, ...newTxs];
         });
 
@@ -88,7 +86,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             if (!detailsRes.ok) throw new Error((await detailsRes.json()).message || 'Failed to fetch wallet details');
             setWalletDetails(await detailsRes.json());
             
-            // Initial transaction fetch
             await fetchTransactions(address);
 
         } catch (e: any) {
@@ -111,7 +108,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
   const displayedDetails = useMemo(() => {
     if (useMockData) {
-      // Create some mock details for the graph to use
       const MOCK_SOL_PRICE = 150;
       return { address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [] };
     }
@@ -119,7 +115,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   }, [useMockData, walletDetails, address]);
   
   const solPrice = useMemo(() => {
-    if (!displayedDetails) return null;
+    if (!displayedDetails) return 0;
     return displayedDetails.sol.price;
   }, [displayedDetails]);
 

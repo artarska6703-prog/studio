@@ -6,7 +6,7 @@ export interface TokenHolding {
   symbol: string;
   amount: number;   // human-readable (decimals applied)
   decimals: number;
-  valueUSD: number | null; // amount * price
+  valueUSD: number; // amount * price, never null
   icon?: string;
   tokenStandard: any;
 }
@@ -15,8 +15,8 @@ export interface WalletDetails {
   address: string;
   sol: {
     balance: number;   // in SOL (not lamports)
-    price: number | null;     // USD per SOL
-    valueUSD: number | null;  // balance * price
+    price: number;     // USD per SOL, never null
+    valueUSD: number;  // balance * price, never null
   };
   tokens: TokenHolding[];
 }
@@ -45,7 +45,6 @@ export interface Transaction {
   nativeTransfers?: ParsedTransfer[];
   tokenTransfers?: ParsedTransfer[];
   events?: any;
-  // Properties added for mock data that need to be in the base type
   amount: number;
   valueUSD: number | null;
   symbol: string | null;
@@ -68,5 +67,5 @@ export interface FlattenedTransaction extends Transaction {
   by: string;
   instruction: string;
   interactedWith: string[];
-  valueUSD: number | null;         // always numeric (>= 0)
+  valueUSD: number;         // always numeric (>= 0), never null
 }

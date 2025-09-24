@@ -4,63 +4,11 @@ import { LAMPORTS_PER_SOL, PublicKey, Connection } from '@solana/web3.js';
 import type { TokenHolding, WalletDetails } from '@/lib/types';
 import { isValidSolanaAddress } from '@/lib/solana-utils';
 import { Helius } from "helius-sdk";
-import { unstable_cache } from 'next/cache';
+import { getTokenPrices } from '@/lib/price-utils';
 
 const heliusApiKey = "9e385df8-c8d3-4916-9615-3c9320ca87ff";
 const rpcEndpoint = "https://solana-mainnet.api.syndica.io/api-key/4kc7afJfAHBE2BvjRPSNR8RcdcJxSEtc6oMqaDnEDzX8Mx5zYZRFXT67dHLmJNqcccdW817WZaM4edyHNqLp8839nq3W9DRaay6";
-
-const getTokenPrices = unstable_cache(
-    async (mints: string[]) => {
-        if (mints.length === 0) return {};
-        try {
-            const helius = new Helius(heliusApiKey);
-            const prices: { [mint: string]: number } = {};
-            // Helius getAssetBatch is better but not available in all SDK versions easily.
-            // Let's do it one by one and cache it.
-            const pricePromises = mints.map(async (mint) => {
-                try {
-                    const asset = await helius.rpc.getAsset(mint);
-                    if (asset?.token_info?.price_info?.price_per_token) {
-                        return { mint, price: asset.token_info.price_info.price_per_token };
-                    }
-                } catch (e) {
-                    console.error(`Failed to fetch price for mint ${mint} from Helius`, e);
-                }
-                return { mint, price: null };
-            });
-
-            const results = await Promise.all(pricePromises);
-            
-            for (const result of results) {
-                if (result.price !== null) {
-                    prices[result.mint] = result.price;
-                }
-            }
-            return prices;
-        } catch (error) {
-            console.error("Failed to fetch token prices from Helius:", error);
-            return {};
-        }
-    },
-    ['helius-token-prices'],
-    { revalidate: 60 } // Revalidate every 60 seconds
-);
-
-
-const getSolanaPrice = unstable_cache(
-    async () => {
-        try {
-            const helius = new Helius(heliusApiKey);
-            const asset = await helius.rpc.getAsset("So11111111111111111111111111111111111111112");
-            return asset?.token_info?.price_info?.price_per_token ?? null;
-        } catch (error) {
-            console.error("Failed to fetch Solana price from Helius:", error);
-            return null;
-        }
-    },
-    ['helius-solana-price'],
-    { revalidate: 60 }
-);
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 
 export async function GET(
@@ -82,9 +30,7 @@ export async function GET(
             helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 })
         ]);
         
-        let tokens: TokenHolding[] = [];
-        const tokenMints: string[] = []; 
-
+        const tokenMints = [SOL_MINT]; 
         if (assets && assets.items) {
             assets.items.forEach(asset => {
                  if (asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance && asset.token_info.balance > 0) {
@@ -93,21 +39,20 @@ export async function GET(
             });
         }
         
-        const [solPrice, tokenPrices] = await Promise.all([
-            getSolanaPrice(),
-            getTokenPrices(tokenMints)
-        ]);
-        
-        const balance = solBalanceLamports / LAMPORTS_PER_SOL;
-        const balanceUSD = solPrice ? balance * solPrice : null;
+        const prices = await getTokenPrices(tokenMints);
+        const solPrice = prices[SOL_MINT] ?? 0;
 
+        const balance = solBalanceLamports / LAMPORTS_PER_SOL;
+        const balanceUSD = balance * solPrice;
+
+        let tokens: TokenHolding[] = [];
         if (assets && assets.items) {
              tokens = assets.items
                 .filter(asset => asset.interface === 'FungibleToken' && asset.content?.metadata && asset.token_info?.balance)
                 .map(asset => {
                     const amount = asset.token_info.balance / (10 ** asset.token_info.decimals);
-                    const price = tokenPrices[asset.id];
-                    const valueUSD = price ? amount * price : null;
+                    const price = prices[asset.id] ?? 0;
+                    const valueUSD = amount * price;
 
                     return {
                         mint: asset.id,
@@ -137,9 +82,8 @@ export async function GET(
 
     } catch (error: any) {
         console.error(`[API WALLET DETAILS] Failed to fetch for ${address}:`, error);
-        // It's possible the account doesn't exist, which can be a valid case (e.g., empty wallet).
         if (error.message && error.message.includes('could not find account')) {
-             const walletDetails: WalletDetails = { address, sol: { balance: 0, price: null, valueUSD: 0 }, tokens: [] };
+             const walletDetails: WalletDetails = { address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
              return NextResponse.json(walletDetails);
         }
         return NextResponse.json({ message: `Failed to fetch wallet details: ${error.message}` }, { status: 500 });

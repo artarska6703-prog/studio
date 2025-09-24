@@ -5,7 +5,6 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '../ui/skeleton';
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 
@@ -70,7 +69,7 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
                     {token.amount.toLocaleString('en-US', { maximumFractionDigits: 4, })}
                   </TableCell>
                    <TableCell className="text-right font-code">
-                    {token.valueUSD !== null ? formatCurrency(token.valueUSD) : <Skeleton className="h-5 w-16 ml-auto" />}
+                    {formatCurrency(token.valueUSD)}
                   </TableCell>
                 </TableRow>
               )) : (

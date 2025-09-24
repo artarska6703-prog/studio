@@ -3,14 +3,27 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Helius, TransactionType } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
+import { getTokenPrices } from "@/lib/price-utils";
 
 
 const HELIUS_API_KEY = "9e385df8-c8d3-4916-9615-3c9320ca87ff";
 const SYNDICA_RPC_URL = "https://solana-mainnet.api.syndica.io/api-key/4kc7afJfAHBE2BvjRPSNR8RcdcJxSEtc6oMqaDnEDzX8Mx5zYZRFXT67dHLmJNqcccdW817WZaM4edyHNqLp8839nq3W9DRaay6";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-const processHeliusTransactions = (transactions: Transaction[], walletAddress: string): FlattenedTransaction[] => {
+
+const processHeliusTransactions = async (transactions: Transaction[], walletAddress: string): Promise<FlattenedTransaction[]> => {
     const flattenedTxs: FlattenedTransaction[] = [];
     if (!transactions || transactions.length === 0) return flattenedTxs;
+
+    const mints = new Set<string>([SOL_MINT]);
+    transactions.forEach(tx => {
+        tx.tokenTransfers?.forEach(t => {
+            if(t.mint) mints.add(t.mint);
+        })
+    });
+
+    const prices = await getTokenPrices(Array.from(mints));
+    const solPrice = prices[SOL_MINT] ?? 0;
 
     transactions.forEach(tx => {
         let hasRelevantTransfer = false;
@@ -27,21 +40,23 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                     const sign = (transfer.fromUserAccount === walletAddress || (transfer.owner === walletAddress && transfer.fromUserAccount !== walletAddress)) ? -1 : 1;
                     const finalAmount = sign * amountRaw;
                     
-                    const valueUSD = isNative ? (Math.abs(finalAmount) * 150) : null; // Simple SOL price estimate
+                    const mint = isNative ? SOL_MINT : transfer.mint;
+                    const price = prices[mint] ?? 0;
+                    const valueUSD = Math.abs(finalAmount) * price;
 
                     flattenedTxs.push({
                         ...tx,
-                        blockTime: tx.timestamp || tx.blockTime, // Use timestamp from Helius response
+                        blockTime: tx.timestamp || tx.blockTime,
                         type: finalAmount > 0 ? 'received' : 'sent',
                         amount: finalAmount,
                         symbol: isNative ? 'SOL' : transfer.mint, // temp symbol
-                        mint: isNative ? 'So11111111111111111111111111111111111111112' : transfer.mint,
+                        mint: mint,
                         from: transfer.fromUserAccount,
                         to: transfer.toUserAccount,
                         by: tx.feePayer,
                         instruction: tx.type,
                         interactedWith: Array.from(new Set([tx.feePayer, transfer.fromUserAccount, transfer.toUserAccount].filter(a => a && a !== walletAddress))),
-                        valueUSD: valueUSD, // Use the fixed calculation
+                        valueUSD: valueUSD,
                     });
                 }
             });
@@ -53,7 +68,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
         if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
             flattenedTxs.push({
                 ...tx,
-                blockTime: tx.timestamp || tx.blockTime, // Also apply fix here
+                blockTime: tx.timestamp || tx.blockTime,
                 type: 'program_interaction',
                 amount: 0,
                 symbol: null,
@@ -63,7 +78,7 @@ const processHeliusTransactions = (transactions: Transaction[], walletAddress: s
                 by: tx.feePayer,
                 instruction: tx.type,
                 interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
-                valueUSD: null,
+                valueUSD: 0, // Fee payer interactions have no direct value transfer
             });
         }
     });
@@ -113,8 +128,7 @@ export async function GET(
     
     const parsedTxs = await helius.parseTransactions({ transactions: signatureStrings });
 
-    // Ensure parsedTxs is an array before processing
-    const processedTxs = processHeliusTransactions(parsedTxs || [], params.address);
+    const processedTxs = await processHeliusTransactions(parsedTxs || [], params.address);
     
     const nextCursor = signatures.length > 0 ? signatures[signatures.length - 1]?.signature : null;
 

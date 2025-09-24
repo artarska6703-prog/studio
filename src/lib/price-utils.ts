@@ -6,16 +6,19 @@ import { loadTokenMap } from "./token-list";
  */
 export async function getTokenPrices(mints: string[]): Promise<Record<string, number>> {
   if (!mints?.length) return {};
+  const uniqueMints = [...new Set(mints)];
   const tokenMap = await loadTokenMap();
 
   const mintToSymbol: Record<string, string> = {};
   const ids: string[] = [];
 
-  for (const mint of mints) {
+  for (const mint of uniqueMints) {
     const sym = tokenMap.get(mint);
     if (sym) {
       mintToSymbol[mint] = sym;
-      ids.push(sym);
+      if (!ids.includes(sym)) {
+        ids.push(sym);
+      }
     }
   }
 
@@ -32,7 +35,7 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   }
 
   const out: Record<string, number> = {};
-  for (const mint of mints) {
+  for (const mint of uniqueMints) {
     const sym = mintToSymbol[mint];
     const p = sym && data?.data?.[sym]?.price;
     out[mint] = typeof p === "number" ? p : 0;
