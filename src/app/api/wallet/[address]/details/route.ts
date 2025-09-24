@@ -72,6 +72,7 @@ export async function GET(
                         symbol: asset.content?.metadata?.symbol || '???',
                         amount: amount,
                         decimals: asset.token_info?.decimals ?? 0,
+                        price: price,
                         valueUSD: valueUSD,
                         icon: asset.content?.files?.[0]?.uri,
                         tokenStandard: asset.token_info?.token_program as any,

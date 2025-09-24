@@ -104,8 +104,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setNextSignature(null);
         const MOCK_SOL_PRICE = 150;
         setWalletDetails({ address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [
-            { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', symbol: 'USDC', amount: 500.50, decimals: 6, valueUSD: 500.50, tokenStandard: 'Fungible' },
-            { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', name: 'Bonk', symbol: 'BONK', amount: 1000000, decimals: 5, valueUSD: 25.30, tokenStandard: 'Fungible' }
+            { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', symbol: 'USDC', amount: 500.50, decimals: 6, valueUSD: 500.50, price: 1, tokenStandard: 'Fungible' },
+            { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', name: 'Bonk', symbol: 'BONK', amount: 1000000, decimals: 5, valueUSD: 25.30, price: 0.0000253, tokenStandard: 'Fungible' }
         ] });
     }
   }, [address, useMockData, fetchTransactions]);

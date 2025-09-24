@@ -7,6 +7,7 @@ export interface TokenHolding {
   symbol: string;
   amount: number;   // human-readable (decimals applied)
   decimals: number;
+  price: number;
   valueUSD: number; // amount * price, never null, always a number
   icon?: string;
   tokenStandard: any;
