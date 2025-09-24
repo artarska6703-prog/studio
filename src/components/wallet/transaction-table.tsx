@@ -145,7 +145,7 @@ export function TransactionTable({
         symbol: 'SOL',
         amount: 0,
         decimals: 9,
-        valueUSD: null,
+        valueUSD: 0,
         tokenStandard: 'Native' as any
     });
     return map;
