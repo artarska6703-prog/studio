@@ -1,51 +1,61 @@
-
 // src/lib/price-utils.ts
 import { loadTokenMap } from "./token-list";
 
-/**
- * Returns a map of { [mint]: priceUSD }, always numeric (unknown => 0).
- */
+const JUP_PRICE_URL = "https://price.jup.ag/v6/price";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
 export async function getTokenPrices(mints: string[]): Promise<Record<string, number>> {
   if (!mints?.length) return {};
-  const uniqueMints = [...new Set(mints)];
+  const uniqueMints = Array.from(new Set(mints));
   const tokenMap = await loadTokenMap();
 
   const mintToSymbol: Record<string, string> = {};
-  const symbolsForApi = new Set<string>();
+  const symbols = new Set<string>();
 
   for (const mint of uniqueMints) {
-    const symbol = tokenMap.get(mint);
-    if (symbol) {
-      mintToSymbol[mint] = symbol;
-      symbolsForApi.add(symbol);
+    const sym = tokenMap.get(mint);
+    if (sym) {
+      mintToSymbol[mint] = sym;
+      symbols.add(sym);
     }
   }
-  
-  const idsForApi = Array.from(symbolsForApi);
-  let priceData: any = {};
-  if (idsForApi.length > 0) {
+
+  let data: any = {};
+  if (symbols.size > 0) {
     try {
-      const url = `https://price.jup.ag/v6/price?ids=${idsForApi.join(",")}`;
-      const res = await fetch(url, {
-        headers: { 'Accept': 'application/json' }
-      });
+      const url = `${JUP_PRICE_URL}?ids=${Array.from(symbols).join(",")}`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (res.ok) {
-        priceData = (await res.json()).data || {};
+        const json = await res.json();
+        data = json?.data || {};
       } else {
-        console.error("[Price] Jupiter API error:", res.status, await res.text());
+        console.error("[Price] Jupiter error:", res.status, await res.text());
       }
     } catch (e) {
-      console.error("[Price] Fetch error:", e);
+      console.error("[Price] fetch error:", e);
     }
   }
 
-  const prices: Record<string, number> = {};
+  const out: Record<string, number> = {};
   for (const mint of uniqueMints) {
-    const symbol = mintToSymbol[mint];
-    const priceInfo = symbol ? priceData[symbol] : undefined;
-    const price = priceInfo?.price;
-    prices[mint] = typeof price === "number" ? price : 0;
+    const sym = mintToSymbol[mint];
+    const p = sym && data?.[sym]?.price;
+    out[mint] = typeof p === "number" ? p : 0;
   }
 
-  return prices;
+  // Hard fallback for SOL if still zero (network hiccup or mapping miss)
+  if ((uniqueMints.includes(SOL_MINT)) && out[SOL_MINT] === 0) {
+    try {
+      const res = await fetch(`${JUP_PRICE_URL}?ids=SOL`, { headers: { Accept: "application/json" } });
+      if (res.ok) {
+        const json = await res.json();
+        const p = json?.data?.SOL?.price;
+        if (typeof p === "number") out[SOL_MINT] = p;
+      }
+    } catch (e) {
+      console.error("[Price] SOL fallback error:", e);
+    }
+  }
+
+  return out;
 }

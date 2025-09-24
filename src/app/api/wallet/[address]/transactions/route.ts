@@ -1,96 +1,89 @@
-
+// src/app/api/wallet/[address]/transactions/route.ts
 import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
 import { getTokenPrices } from "@/lib/price-utils";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { loadTokenMap } from "@/lib/token-list";
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL;
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
+const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-const processHeliusTransactions = async (transactions: Transaction[], walletAddress: string): Promise<FlattenedTransaction[]> => {
-    const flattenedTxs: FlattenedTransaction[] = [];
-    if (!transactions || transactions.length === 0) return flattenedTxs;
-    
-    const mints = new Set<string>([SOL_MINT]);
-    transactions.forEach(tx => {
-        tx.tokenTransfers?.forEach(t => {
-            if (t.mint) mints.add(t.mint);
+function toFlattened(
+  transactions: Transaction[],
+  walletAddress: string,
+  prices: Record<string, number>,
+  tokenMap: Map<string, string>
+): FlattenedTransaction[] {
+  const out: FlattenedTransaction[] = [];
+  if (!transactions?.length) return out;
+
+  for (const tx of transactions) {
+    let any = false;
+    const blockTime = tx.timestamp || tx.blockTime;
+
+    const handle = (arr: any[] | undefined, isNative: boolean) => {
+      if (!arr) return;
+      for (const t of arr) {
+        const involved = t.fromUserAccount === walletAddress || t.toUserAccount === walletAddress;
+        if (!involved) continue;
+
+        const amount = isNative
+          ? (t.amount || 0) / 1e9
+          : (typeof t.tokenAmount === "number"
+              ? t.tokenAmount
+              : 0);
+
+        if (!amount) continue;
+        any = true;
+
+        const outgoing = t.fromUserAccount === walletAddress;
+        const signed = outgoing ? -amount : amount;
+
+        const mint = isNative ? SOL_MINT : t.mint;
+        const price = prices[mint] ?? 0;
+        const symbol = isNative ? "SOL" : (tokenMap.get(mint) || (t.mint?.slice(0, 4) ?? "?"));
+
+        out.push({
+          ...tx,
+          blockTime,
+          type: signed > 0 ? "received" : "sent",
+          amount: signed,
+          symbol,
+          mint,
+          from: t.fromUserAccount,
+          to: t.toUserAccount,
+          by: tx.feePayer,
+          instruction: tx.type,
+          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean))).filter(a => a !== walletAddress),
+          valueUSD: Math.abs(signed) * price, // numeric, never null
         });
-    });
+      }
+    };
 
-    const prices = await getTokenPrices(Array.from(mints));
+    handle(tx.nativeTransfers, true);
+    handle(tx.tokenTransfers, false);
 
-    transactions.forEach(tx => {
-        let hasRelevantTransfer = false;
-        
-        const processTransfers = (transfers: any[] | undefined | null, isNative: boolean) => {
-            if (!transfers) return;
-            
-            transfers.forEach(transfer => {
-                const isOwnerInvolved = transfer.fromUserAccount === walletAddress || transfer.toUserAccount === walletAddress;
-                
-                if (isOwnerInvolved && (isNative ? transfer.amount > 0 : transfer.tokenAmount > 0)) {
-                    hasRelevantTransfer = true;
-                    
-                    const amountRaw = isNative ? transfer.amount / 1e9 : transfer.tokenAmount;
-                    const sign = transfer.fromUserAccount === walletAddress ? -1 : 1;
-                    const finalAmount = sign * amountRaw;
-                    
-                    const mint = isNative ? SOL_MINT : transfer.mint;
-                    const price = prices[mint] ?? 0;
-                    const valueUSD = Math.abs(finalAmount) * price;
-
-                    flattenedTxs.push({
-                        signature: tx.signature,
-                        timestamp: tx.timestamp,
-                        blockTime: tx.timestamp,
-                        fee: tx.fee,
-                        feePayer: tx.feePayer,
-                        instructions: tx.instructions,
-                        type: finalAmount > 0 ? 'received' : 'sent',
-                        amount: finalAmount,
-                        symbol: null, 
-                        mint: mint,
-                        from: transfer.fromUserAccount,
-                        to: transfer.toUserAccount,
-                        by: tx.feePayer,
-                        instruction: tx.type,
-                        interactedWith: Array.from(new Set([tx.feePayer, transfer.fromUserAccount, transfer.toUserAccount].filter(a => a && a !== walletAddress) as string[])),
-                        valueUSD: valueUSD,
-                    });
-                }
-            });
-        };
-        
-        processTransfers(tx.nativeTransfers, true);
-        processTransfers(tx.tokenTransfers, false);
-
-        if (!hasRelevantTransfer && tx.feePayer === walletAddress) {
-            flattenedTxs.push({
-                signature: tx.signature,
-                timestamp: tx.timestamp,
-                blockTime: tx.timestamp,
-                fee: tx.fee,
-                feePayer: tx.feePayer,
-                instructions: tx.instructions,
-                type: 'program_interaction',
-                amount: 0,
-                symbol: null,
-                mint: null,
-                from: tx.feePayer,
-                to: tx.instructions?.[0]?.programId || null,
-                by: tx.feePayer,
-                instruction: tx.type,
-                interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
-                valueUSD: 0,
-            });
-        }
-    });
-
-    return flattenedTxs;
+    if (!any && tx.feePayer === walletAddress) {
+      out.push({
+        ...tx,
+        blockTime,
+        type: "program_interaction",
+        amount: 0,
+        symbol: null,
+        mint: null,
+        from: tx.feePayer,
+        to: tx.instructions?.[0]?.programId || null,
+        by: tx.feePayer,
+        instruction: tx.type,
+        interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
+        valueUSD: 0,
+      });
+    }
+  }
+  return out;
 }
 
 export async function GET(
@@ -100,48 +93,41 @@ export async function GET(
   if (!HELIUS_API_KEY || !RPC_ENDPOINT) {
     return NextResponse.json({ error: "Server configuration error: API keys are missing." }, { status: 500 });
   }
+  const address = params?.address || "";
+  if (!isValidSolanaAddress(address)) {
+    return NextResponse.json({ error: "A valid wallet address must be provided." }, { status: 400 });
+  }
 
   try {
-    if (!params?.address || !isValidSolanaAddress(params.address)) {
-      return NextResponse.json(
-        { error: "A valid wallet address must be provided." },
-        { status: 400 }
-      );
-    }
-    
     const helius = new Helius(HELIUS_API_KEY);
-    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+    const connection = new Connection(RPC_ENDPOINT, "confirmed");
+    const publicKey = new PublicKey(address);
+
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
-    const publicKey = new PublicKey(params.address);
+    const limit = parseInt(searchParams.get("limit") || "100", 10);
 
-    const signatureInfo = await connection.getSignaturesForAddress(publicKey, { 
-        limit: 100,
-        before,
-    });
-    
-    if (!signatureInfo || signatureInfo.length === 0) {
+    const sigInfo = await connection.getSignaturesForAddress(publicKey, { limit, before });
+    if (!sigInfo?.length) {
       return NextResponse.json({ transactions: [], nextCursor: null });
     }
 
-    const signatureStrings = signatureInfo.map(sig => sig.signature);
-    const response = await helius.parseTransactions({ transactions: signatureStrings });
-    
-    const parsedTxs = response.map(tx => tx as unknown as Transaction);
+    const sigs = sigInfo.map(s => s.signature);
+    const parsed = await helius.parseTransactions({ transactions: sigs });
+    const txs = Array.isArray(parsed) ? parsed as Transaction[] : [];
 
-    const processedTxs = await processHeliusTransactions(parsedTxs, params.address);
-    
-    const nextCursor = signatureInfo.length > 0 ? signatureInfo[signatureInfo.length - 1]?.signature : null;
+    const tokenMap = await loadTokenMap();
 
-    return NextResponse.json({
-      transactions: processedTxs,
-      nextCursor,
-    });
+    const mints = new Set<string>([SOL_MINT]);
+    for (const tx of txs) for (const t of tx.tokenTransfers ?? []) if (t.mint) mints.add(t.mint);
+
+    const prices = await getTokenPrices(Array.from(mints));
+    const flattened = toFlattened(txs, address, prices, tokenMap);
+    const nextCursor = sigInfo[sigInfo.length - 1]?.signature || null;
+
+    return NextResponse.json({ transactions: flattened, nextCursor });
   } catch (err: any) {
-    console.error("Error fetching wallet transactions:", err);
-    return NextResponse.json(
-      { error: err?.message || "Unknown error", stack: String(err) },
-      { status: 500 }
-    );
+    console.error("[transactions] error:", err);
+    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
   }
 }
