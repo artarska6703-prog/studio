@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LAMPORTS_PER_SOL, PublicKey, Connection } from '@solana/web3.js';
 import type { TokenHolding, WalletDetails } from '@/lib/types';
 import { isValidSolanaAddress } from '@/lib/solana-utils';
-import { Helius } from "helius-sdk";
+import { createHelius } from "helius-sdk";
 import { getTokenPrices } from '@/lib/price-utils';
 
 const heliusApiKey = process.env.HELIUS_API_KEY;
@@ -26,7 +26,7 @@ export async function GET(
     }
 
     try {
-        const helius = new Helius(heliusApiKey);
+        const helius = createHelius({ apiKey: heliusApiKey });
         const connection = new Connection(rpcEndpoint, 'confirmed');
         
         let solBalanceLamports = 0;
