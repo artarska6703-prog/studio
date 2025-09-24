@@ -1,5 +1,5 @@
 
-import { createHelius } from "helius-sdk";
+import heliusSdk from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
 import { getTokenPrices } from "@/lib/price-utils";
@@ -109,7 +109,7 @@ export async function GET(
       );
     }
     
-    const helius = createHelius({ apiKey: HELIUS_API_KEY });
+    const helius = heliusSdk.createHelius({ apiKey: HELIUS_API_KEY });
     const connection = new Connection(RPC_ENDPOINT, 'confirmed');
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
