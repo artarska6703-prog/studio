@@ -13,11 +13,11 @@ interface BalanceCardProps {
 }
 
 export function BalanceCard({ balance, balanceUSD, className }: BalanceCardProps) {
-    const [displayBalance, setDisplayBalance] = useState(balance);
+  const [displayBalance, setDisplayBalance] = useState(balance);
 
-    useEffect(() => {
-      setDisplayBalance(balance);
-    }, [balance]);
+  useEffect(() => {
+    setDisplayBalance(balance);
+  }, [balance]);
 
   return (
     <Card className={cn(className)}>

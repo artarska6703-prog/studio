@@ -19,7 +19,7 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
   const sortedTokens = useMemo(() => {
-    return [...tokens].sort((a, b) => (b.valueUSD ?? 0) - (a.valueUSD ?? 0));
+    return [...tokens].sort((a, b) => b.valueUSD - a.valueUSD);
   }, [tokens]);
 
   const paginatedTokens = useMemo(() => {

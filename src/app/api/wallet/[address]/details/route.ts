@@ -28,11 +28,20 @@ export async function GET(
     try {
         const helius = new Helius(heliusApiKey);
         const connection = new Connection(rpcEndpoint, 'confirmed');
-
-        const [solBalanceLamports, assets] = await Promise.all([
-            connection.getBalance(new PublicKey(address)),
-            helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 })
-        ]);
+        
+        // Use a try-catch for getBalance as the account might not exist
+        let solBalanceLamports = 0;
+        try {
+            solBalanceLamports = await connection.getBalance(new PublicKey(address));
+        } catch (e: any) {
+            if (e.message.includes('could not find account')) {
+                // This is fine, it just means the wallet is new or empty.
+            } else {
+                throw e; // Re-throw other errors
+            }
+        }
+        
+        const assets = await helius.rpc.getAssetsByOwner({ ownerAddress: address, page: 1, limit: 1000 });
         
         const tokenMints = [SOL_MINT]; 
         if (assets && assets.items) {
@@ -69,7 +78,7 @@ export async function GET(
                         tokenStandard: asset.token_info.token_program as any,
                     };
                 })
-                .filter(token => token.amount > 0);
+                .filter(token => token.amount > 0 && token.valueUSD > 0.01); // Also filter out very low value tokens
         }
 
         const walletDetails: WalletDetails = { 
@@ -86,6 +95,7 @@ export async function GET(
 
     } catch (error: any) {
         console.error(`[API WALLET DETAILS] Failed to fetch for ${address}:`, error);
+        // If the error is that the account is not found, return a default zero state
         if (error.message && error.message.includes('could not find account')) {
              const walletDetails: WalletDetails = { address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
              return NextResponse.json(walletDetails);

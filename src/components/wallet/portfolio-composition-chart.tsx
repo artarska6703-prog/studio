@@ -6,7 +6,6 @@ import { formatCurrency } from '@/lib/utils';
 import { useMemo } from "react";
 import { Skeleton } from "../ui/skeleton";
 
-
 interface PortfolioCompositionChartProps {
   solValue: number | null;
   tokens: TokenHolding[];
@@ -55,7 +54,7 @@ export function PortfolioCompositionChart({ solValue, tokens }: PortfolioComposi
   
   const chartData = useMemo(() => {
       const data = [];
-      if (solValue && solValue > 0) {
+      if (solValue && solValue > 1) { // Only include SOL if it has meaningful value
           data.push({ name: 'SOL', value: solValue });
       }
 
@@ -97,7 +96,6 @@ export function PortfolioCompositionChart({ solValue, tokens }: PortfolioComposi
       )
   }
 
-
   return (
     <Card>
       <CardHeader>
@@ -134,7 +132,7 @@ export function PortfolioCompositionChart({ solValue, tokens }: PortfolioComposi
                             paddingLeft: '40px'
                         }}
                         formatter={(value, entry) => {
-                            const { color, payload } = entry;
+                            const { payload } = entry;
                             const percent = (payload.value / totalValue) * 100;
                             return (
                                 <span style={{ color: 'hsl(var(--foreground))' }}>

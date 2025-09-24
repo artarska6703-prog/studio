@@ -1,3 +1,4 @@
+
 // src/lib/token-list.ts
 
 let cached: Map<string, string> | null = null;
@@ -30,8 +31,9 @@ export async function loadTokenMap(): Promise<Map<string, string>> {
     lastFetch = now;
   } catch (e) {
     console.error("[TokenList] fetch error:", e);
-    cached = cached || new Map(); // keep previous if any
+    // If fetch fails, start with an empty map but still ensure criticals
+    cached = cached || new Map();
   }
-
+  
   return ensureCritical(cached!);
 }

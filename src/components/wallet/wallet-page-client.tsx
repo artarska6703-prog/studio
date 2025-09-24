@@ -7,7 +7,7 @@ import { Header } from "@/components/layout/header";
 import { BalanceCard } from "@/components/wallet/balance-card";
 import { TransactionTable } from "@/components/wallet/transaction-table";
 import { WalletHeader } from "@/components/wallet/wallet-header";
-import type { WalletDetails, FlattenedTransaction, Transaction } from "@/lib/types";
+import type { WalletDetails, FlattenedTransaction } from "@/lib/types";
 import Loading from '@/app/wallet/[address]/loading';
 import { TokenTable } from '@/components/wallet/token-table';
 import { Button } from '@/components/ui/button';
@@ -102,22 +102,14 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setError(null);
         setAllTransactions([]);
         setNextSignature(null);
+        const MOCK_SOL_PRICE = 150;
+        setWalletDetails({ address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [
+            { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', symbol: 'USDC', amount: 500.50, decimals: 6, valueUSD: 500.50, tokenStandard: 'Fungible' },
+            { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', name: 'Bonk', symbol: 'BONK', amount: 1000000, decimals: 5, valueUSD: 25.30, tokenStandard: 'Fungible' }
+        ] });
     }
   }, [address, useMockData, fetchTransactions]);
 
-
-  const displayedDetails = useMemo(() => {
-    if (useMockData) {
-      const MOCK_SOL_PRICE = 150;
-      return { address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [] };
-    }
-    return walletDetails;
-  }, [useMockData, walletDetails, address]);
-  
-  const solPrice = useMemo(() => {
-    if (!displayedDetails) return 0;
-    return displayedDetails.sol.price;
-  }, [displayedDetails]);
 
   const liveTransactions = useMemo(() => {
     if (useMockData) {
@@ -130,6 +122,11 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     return allTransactions;
   }, [useMockData, allTransactions, mockScenario, address]);
   
+  const solPrice = useMemo(() => {
+    if (!walletDetails) return 0;
+    return walletDetails.sol.price;
+  }, [walletDetails]);
+
   const filteredTransactions = useMemo(() => {
     if (!dateRange || !dateRange.from) return liveTransactions;
     
@@ -194,13 +191,13 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             </TabsList>
             <TabsContent value="portfolio" className="mt-6 space-y-8">
                  <div className="grid gap-8 md:grid-cols-3">
-                    {displayedDetails ? (
+                    {walletDetails ? (
                         <>
                           <BalanceCard
-                              balance={displayedDetails.sol.balance}
-                              balanceUSD={displayedDetails.sol.valueUSD}
+                              balance={walletDetails.sol.balance}
+                              balanceUSD={walletDetails.sol.valueUSD}
                           />
-                          <TokenTable tokens={displayedDetails.tokens} className="md:col-span-2" />
+                          <TokenTable tokens={walletDetails.tokens} className="md:col-span-2" />
                         </>
                     ) : isLoading ? (
                         <>
@@ -209,7 +206,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                         </>
                     ) : <p>No details to display.</p>}
                 </div>
-                {displayedDetails ? <PortfolioCompositionChart solValue={displayedDetails.sol.valueUSD} tokens={displayedDetails.tokens} /> : <p>Loading Chart...</p>}
+                {walletDetails ? <PortfolioCompositionChart solValue={walletDetails.sol.valueUSD} tokens={walletDetails.tokens} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
                  <TransactionTable 

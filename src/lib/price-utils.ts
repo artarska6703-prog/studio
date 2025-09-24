@@ -1,3 +1,4 @@
+
 // src/lib/price-utils.ts
 import { loadTokenMap } from "./token-list";
 
@@ -10,7 +11,7 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   const tokenMap = await loadTokenMap();
 
   const mintToSymbol: Record<string, string> = {};
-  const ids: string[] = [];
+  const ids: string[] = []; // This will be the list of symbols for the API
 
   for (const mint of uniqueMints) {
     const sym = tokenMap.get(mint);
@@ -26,18 +27,23 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   if (ids.length) {
     try {
       const url = `https://price.jup.ag/v6/price?ids=${ids.join(",")}`;
-      const res = await fetch(url);
-      if (res.ok) data = await res.json();
-      else console.error("[Price] Jupiter error:", res.status);
+      const res = await fetch(url, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        data = (await res.json()).data;
+      } else {
+        console.error("[Price] Jupiter API error:", res.status, await res.text());
+      }
     } catch (e) {
-      console.error("[Price] fetch error:", e);
+      console.error("[Price] Fetch error:", e);
     }
   }
 
   const out: Record<string, number> = {};
   for (const mint of uniqueMints) {
     const sym = mintToSymbol[mint];
-    const p = sym && data?.data?.[sym]?.price;
+    const p = sym && data?.[sym]?.price;
     out[mint] = typeof p === "number" ? p : 0;
   }
 

@@ -1,3 +1,4 @@
+
 // src/lib/types.ts
 
 export interface TokenHolding {
@@ -6,7 +7,7 @@ export interface TokenHolding {
   symbol: string;
   amount: number;   // human-readable (decimals applied)
   decimals: number;
-  valueUSD: number; // amount * price, never null
+  valueUSD: number; // amount * price, never null, always a number
   icon?: string;
   tokenStandard: any;
 }
@@ -15,8 +16,8 @@ export interface WalletDetails {
   address: string;
   sol: {
     balance: number;   // in SOL (not lamports)
-    price: number;     // USD per SOL, never null
-    valueUSD: number;  // balance * price, never null
+    price: number;     // USD per SOL, never null, always a number
+    valueUSD: number;  // balance * price, never null, always a number
   };
   tokens: TokenHolding[];
 }
@@ -25,7 +26,7 @@ export interface ParsedTransfer {
   fromUserAccount?: string;
   toUserAccount?: string;
   owner?: string;
-  amount?: number;
+  amount: number; // lamports or token units without decimals
   tokenAmount?: number;
   mint?: string;
 }
@@ -45,12 +46,16 @@ export interface Transaction {
   events?: any;
 }
 
-
-export interface FlattenedTransaction extends Transaction {
+export interface FlattenedTransaction {
+  signature: string;
   blockTime: number;
+  timestamp: number;
+  fee: number;
+  feePayer: string;
+  instructions: any[];
   type: "received" | "sent" | "program_interaction";
   amount: number;           // signed (+in/-out)
-  symbol: string | null;    // "SOL" or SPL symbol
+  symbol: string | null;    // "SOL" or SPL symbol - can be resolved on frontend
   mint: string | null;      // SPL mint
   from: string | null;
   to: string | null;
