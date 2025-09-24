@@ -11,9 +11,15 @@ const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
 
 function ensureCritical(c: Map<string, string>) {
-  c.set(SOL_MINT, "SOL");
-  c.set(USDC_MINT, "USDC");
-  c.set(USDT_MINT, "USDT");
+  if (!c.has(SOL_MINT)) {
+    c.set(SOL_MINT, "SOL");
+  }
+  if (!c.has(USDC_MINT)) {
+    c.set(USDC_MINT, "USDC");
+  }
+  if (!c.has(USDT_MINT)) {
+    c.set(USDT_MINT, "USDT");
+  }
   return c;
 }
 
