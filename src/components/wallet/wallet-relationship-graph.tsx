@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -8,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
-import { Transaction } from '@/lib/types';
+import { Transaction, WalletDetails } from '@/lib/types';
 import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles, PhysicsState } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
@@ -100,7 +101,7 @@ export interface DiagnosticData {
 interface WalletNetworkGraphProps {
     walletAddress: string;
     transactions: Transaction[];
-    solPrice: number | null;
+    walletDetails: WalletDetails | null;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
 }
 
@@ -178,7 +179,7 @@ const PhysicsControls = ({ physicsState, setPhysicsState }: { physicsState: Phys
     )
 }
 
-export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions = [], walletDetails, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     
@@ -214,23 +215,8 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice,
         if (!transactions || transactions.length === 0) {
             return { nodes: [], links: [] };
         }
-        
-        // This logic simulates fetching or calculating balances for all involved addresses.
-        // In a real app, this would come from an API call that returns balances for a list of addresses.
-        const addressBalances: { [key: string]: number } = {};
-        transactions.forEach(tx => {
-            if ('from' in tx && tx.from && tx.amount < 0 && tx.mint === 'So11111111111111111111111111111111111111112') {
-                if (!addressBalances[tx.from]) addressBalances[tx.from] = 1000; // Start with a mock balance
-                addressBalances[tx.from] -= tx.amount;
-            }
-             if ('to' in tx && tx.to && tx.amount > 0 && tx.mint === 'So11111111111111111111111111111111111111112') {
-                if (!addressBalances[tx.to]) addressBalances[tx.to] = 0;
-                 addressBalances[tx.to] += tx.amount;
-            }
-        });
 
-
-        const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances, solPrice);
+        const graphData = processTransactions(transactions, walletAddress, maxDepth, walletDetails);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
             (node.balanceUSD ?? 0) >= debouncedMinVolume &&
@@ -242,7 +228,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice,
         const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
-    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, solPrice]);
+    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, walletDetails]);
     
     useEffect(() => {
         onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });

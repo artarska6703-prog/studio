@@ -1,4 +1,5 @@
 
+
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -270,7 +271,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     key={useMockData ? `mock-${mockScenario}` : `real-${address}-${walletDetails?.sol.price}`}
                     walletAddress={address}
                     transactions={liveTransactions}
-                    solPrice={walletDetails?.sol.price || 0}
+                    walletDetails={walletDetails}
                 />
             </TabsContent>
         </Tabs>
