@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DiagnosticData } from './wallet-relationship-graph';
+import { useSearchParams } from 'next/navigation';
+
 
 interface DiagnosticProps {
   diagnosticData: DiagnosticData | null;
@@ -180,27 +182,36 @@ export const NetworkStructureDiagnostic = ({ diagnosticData }: DiagnosticProps) 
 };
   
 // 4. Data Source and Processing Analysis
-export const DataProcessingDiagnostic = ({ diagnosticData }: DiagnosticProps) => {
+export const DataProcessingDiagnostic = () => {
+    const searchParams = useSearchParams();
+    const scenario = searchParams.get('scenario');
+    const isMockData = scenario !== 'real';
     const [date, setDate] = useState<string | null>(null);
 
     useEffect(() => {
-        setDate(new Date().toLocaleDateString());
+        setDate(new Date().toLocaleString());
     }, []);
 
     return (
       <Card>
         <CardHeader><CardTitle>Data Processing Pipeline</CardTitle></CardHeader>
         <CardContent>
-            <div className="p-3 bg-muted rounded-md">
-                <div className="flex items-center justify-between mb-2">
+            <div className="p-3 bg-muted rounded-md space-y-2">
+                <div className="flex items-center justify-between">
                     <span>Current Source:</span>
-                    <span className="px-2 py-1 rounded text-sm bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
-                        Mock Data
-                    </span>
+                    {isMockData ? (
+                        <span className="px-2 py-1 rounded text-sm bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
+                            Mock Data
+                        </span>
+                    ) : (
+                        <span className="px-2 py-1 rounded text-sm bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-100">
+                            Live Data
+                        </span>
+                    )}
                 </div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between">
                     <span>Data Freshness:</span>
-                    <span>{date || 'Loading...'}</span>
+                    <span className="font-mono text-xs">{date || 'Loading...'}</span>
                 </div>
                 <div className="flex items-center justify-between">
                     <span>Data Completeness:</span>
