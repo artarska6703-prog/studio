@@ -340,12 +340,9 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice,
         networkInstance.on('click', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
-                
-                if (nodeId) {
-                     setSelectedNodeAddress(nodeId);
-                     setIsSheetOpen(true);
+                if (nodeId && nodeId !== walletAddress) {
+                    router.push(`/wallet/${nodeId}`);
                 }
-
             }
         });
         
@@ -448,3 +445,5 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice,
         </Card>
     );
 }
+
+    
