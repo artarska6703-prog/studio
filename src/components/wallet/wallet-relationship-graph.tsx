@@ -215,17 +215,17 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice,
             return { nodes: [], links: [] };
         }
         
-        // The addressBalances and solPrice are now derived from the transaction stream,
-        // but we need to compute them for the graph processing.
-        // This is a temporary measure. Ideally, the parent component would provide a unified balance view.
+        // This logic simulates fetching or calculating balances for all involved addresses.
+        // In a real app, this would come from an API call that returns balances for a list of addresses.
         const addressBalances: { [key: string]: number } = {};
         transactions.forEach(tx => {
-            if (tx.from && tx.amount < 0) {
-                if (!addressBalances[tx.from]) addressBalances[tx.from] = 0;
-                // This is not accurate for balance, just for graph sizing
+            if ('from' in tx && tx.from && tx.amount < 0 && tx.mint === 'So11111111111111111111111111111111111111112') {
+                if (!addressBalances[tx.from]) addressBalances[tx.from] = 1000; // Start with a mock balance
+                addressBalances[tx.from] -= tx.amount;
             }
-             if (tx.to && tx.amount > 0) {
+             if ('to' in tx && tx.to && tx.amount > 0 && tx.mint === 'So11111111111111111111111111111111111111112') {
                 if (!addressBalances[tx.to]) addressBalances[tx.to] = 0;
+                 addressBalances[tx.to] += tx.amount;
             }
         });
 
@@ -233,7 +233,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], solPrice,
         const graphData = processTransactions(transactions, walletAddress, maxDepth, addressBalances, solPrice);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
-            (node.interactionVolume ?? 0) >= debouncedMinVolume &&
+            (node.balanceUSD ?? 0) >= debouncedMinVolume &&
             node.transactionCount >= minTransactions &&
             (visibleNodeTypes.includes(node.type) || node.type === 'root')
         );
