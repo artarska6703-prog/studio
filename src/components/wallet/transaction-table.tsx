@@ -167,6 +167,7 @@ interface TransactionTableProps {
   totalTransactions: number;
   dateRange: DateRange | undefined;
   setDateRange: (dateRange: DateRange | undefined) => void;
+  useMockData: boolean;
 }
 
 
@@ -179,7 +180,8 @@ export function TransactionTable({
     isLoadingMore, 
     totalTransactions,
     dateRange,
-    setDateRange
+    setDateRange,
+    useMockData,
 }: TransactionTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -485,5 +487,3 @@ export function TransactionTable({
     </Card>
   );
 }
-
-    

@@ -1,5 +1,3 @@
-
-
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -248,6 +246,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     totalTransactions={liveTransactions.length}
                     dateRange={dateRange}
                     setDateRange={setDateRange}
+                    useMockData={useMockData}
                  />
             </TabsContent>
             <TabsContent value="graph" className="mt-6">
