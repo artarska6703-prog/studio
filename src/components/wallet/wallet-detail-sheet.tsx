@@ -13,7 +13,6 @@ import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
-// Fallback copy function for restrictive environments
 async function copyToClipboard(text: string): Promise<boolean> {
   return new Promise((resolve) => {
     const textArea = document.createElement("textarea");
