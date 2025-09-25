@@ -1,6 +1,6 @@
 
 'use client'
-import { useState, Suspense, useEffect } from 'react';
+import { useState, Suspense, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { DiagnosticData } from '@/components/wallet/wallet-relationship-graph';
@@ -16,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import type { Transaction } from '@/lib/types';
-import { useMemo } from 'react';
 import { processTransactions } from '@/components/wallet/wallet-relationship-graph-utils';
 
 type MockScenario = 'balanced' | 'whale' | 'degen';
@@ -27,19 +26,20 @@ const WalletRelationshipDiagnosticDashboard = () => {
     const walletAddress = searchParams.get('address') || "So11111111111111111111111111111111111111112";
     const scenario = (searchParams.get('scenario') as MockScenario) || 'balanced';
 
-    const getTransactionsForScenario = (address: string, scenario: MockScenario): Transaction[] => {
-        switch (scenario) {
-            case 'whale':
-                return getWhaleTxs(address);
-            case 'degen':
-                return getDegenTxs(address);
-            case 'balanced':
-            default:
-                return getBalancedTxs(address);
-        }
-    };
-
-    const transactions = getTransactionsForScenario(walletAddress, scenario);
+    const transactions = useMemo(() => {
+        const getTransactionsForScenario = (address: string, scenario: MockScenario): Transaction[] => {
+            switch (scenario) {
+                case 'whale':
+                    return getWhaleTxs(address);
+                case 'degen':
+                    return getDegenTxs(address);
+                case 'balanced':
+                default:
+                    return getBalancedTxs(address);
+            }
+        };
+        return getTransactionsForScenario(walletAddress, scenario);
+    }, [walletAddress, scenario]);
     
     const [diagnosticData, setDiagnosticData] = useState<DiagnosticData | null>(null);
 
@@ -49,9 +49,6 @@ const WalletRelationshipDiagnosticDashboard = () => {
             return;
         }
 
-        // The default physics values are now dynamic, so we'll start with a representative set
-        // for the initial render, and it would be updated from the graph page if this were
-        // a real-time diagnostic dashboard connected to the graph state.
         const initialPhysics = {
             solver: "barnesHut",
             gravitationalConstant: -8000,
