@@ -1,7 +1,7 @@
 
 'use client'
 import { useState, Suspense, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { DiagnosticData } from '@/components/wallet/wallet-relationship-graph';
 import { getBalancedTxs, getWhaleTxs, getDegenTxs } from '@/components/wallet/mock-tx-data';
@@ -14,7 +14,6 @@ import {
     PerformanceAnalysisDiagnostic
 } from '@/components/wallet/diagnostic-dashboard';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import type { Transaction } from '@/lib/types';
 import { useMemo } from 'react';
@@ -23,6 +22,7 @@ import { processTransactions } from '@/components/wallet/wallet-relationship-gra
 type MockScenario = 'balanced' | 'whale' | 'degen';
 
 const WalletRelationshipDiagnosticDashboard = () => {
+    const router = useRouter();
     const searchParams = useSearchParams();
     const walletAddress = searchParams.get('address') || "So11111111111111111111111111111111111111112";
     const scenario = (searchParams.get('scenario') as MockScenario) || 'balanced';
@@ -93,11 +93,9 @@ const WalletRelationshipDiagnosticDashboard = () => {
               <p className="text-muted-foreground">Displaying data for scenario: <span className="font-semibold capitalize text-primary">{scenario}</span></p>
             </div>
             {walletAddress && (
-              <Button asChild variant="outline">
-                <Link href={`/wallet/${walletAddress}?tab=graph`}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Graph
-                </Link>
+              <Button onClick={() => router.push(`/wallet/${walletAddress}?tab=graph`)} variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Graph
               </Button>
             )}
         </div>
