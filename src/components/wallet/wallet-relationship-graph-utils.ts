@@ -1,4 +1,5 @@
 
+
 import { Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Transaction, FlattenedTransaction, WalletDetails } from '@/lib/types';
@@ -85,17 +86,22 @@ const getNodeSize = (balance: number, balanceUSD: number | null) => {
     return baseSize;
 }
 
-export const processTransactions = (transactions: (Transaction | FlattenedTransaction)[], rootAddress: string, maxDepth: number, walletDetails: WalletDetails | null): { nodes: GraphNode[], links: GraphLink[] } => {
+export const processTransactions = (
+    transactions: (Transaction | FlattenedTransaction)[],
+    rootAddress: string,
+    maxDepth: number,
+    walletDetails: WalletDetails | null,
+    extraWalletBalances: Record<string, number>
+): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
     }
 
     const solPrice = walletDetails?.sol.price || 0;
-
-    // Start with the authoritative balance for the root wallet
-    const addressBalances: { [key: string]: number } = {};
-    if (walletDetails && walletDetails.address === rootAddress) {
-        addressBalances[rootAddress] = walletDetails.sol.balance;
+    
+    const addressBalances: Record<string, number> = { ...extraWalletBalances };
+    if (walletDetails) {
+        addressBalances[walletDetails.address] = walletDetails.sol.balance;
     }
 
     const addressData: { [key: string]: { txCount: number; interactionVolume: number } } = {};
@@ -121,17 +127,7 @@ export const processTransactions = (transactions: (Transaction | FlattenedTransa
                  addressData[address].interactionVolume += value;
             }
         });
-
-        // Simulate balance changes for non-root wallets
-        if ('from' in tx && tx.from && tx.from !== rootAddress && tx.amount < 0 && tx.mint === 'So11111111111111111111111111111111111111112') {
-             if (!addressBalances[tx.from]) addressBalances[tx.from] = 1000;
-             addressBalances[tx.from] += tx.amount;
-        }
-        if ('to' in tx && tx.to && tx.to !== rootAddress && tx.amount > 0 && tx.mint === 'So11111111111111111111111111111111111111112') {
-            if (!addressBalances[tx.to]) addressBalances[tx.to] = 0;
-            addressBalances[tx.to] += tx.amount;
-        }
-
+        
         if (from && to && from !== to) {
             if (!adjacencyList[from]) adjacencyList[from] = [];
             if (!adjacencyList[to]) adjacencyList[to] = [];

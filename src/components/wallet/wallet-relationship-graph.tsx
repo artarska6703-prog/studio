@@ -102,6 +102,7 @@ interface WalletNetworkGraphProps {
     walletAddress: string;
     transactions: Transaction[];
     walletDetails: WalletDetails | null;
+    extraWalletBalances: Record<string, number>;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
 }
 
@@ -179,7 +180,7 @@ const PhysicsControls = ({ physicsState, setPhysicsState }: { physicsState: Phys
     )
 }
 
-export function WalletNetworkGraph({ walletAddress, transactions = [], walletDetails, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions = [], walletDetails, extraWalletBalances, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     
@@ -216,7 +217,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
             return { nodes: [], links: [] };
         }
 
-        const graphData = processTransactions(transactions, walletAddress, maxDepth, walletDetails);
+        const graphData = processTransactions(transactions, walletAddress, maxDepth, walletDetails, extraWalletBalances);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
             (node.balanceUSD ?? 0) >= debouncedMinVolume &&
@@ -228,7 +229,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
         const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
-    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, walletDetails]);
+    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, walletDetails, extraWalletBalances]);
     
     useEffect(() => {
         onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });

@@ -37,6 +37,7 @@ type WalletPageViewProps = {
 export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
+  const [extraWalletBalances, setExtraWalletBalances] = useState<Record<string, number>>({});
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,6 +45,25 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [useMockData, setUseMockData] = useState(false);
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const fetchBalances = async (addresses: string[]) => {
+    if (addresses.length === 0) return;
+    try {
+        const res = await fetch('/api/wallet/balances', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addresses }),
+        });
+        if (!res.ok) {
+            console.error('Failed to fetch extra balances');
+            return;
+        }
+        const { balances } = await res.json();
+        setExtraWalletBalances(prev => ({ ...prev, ...balances }));
+    } catch (e) {
+        console.error('Error fetching extra balances', e);
+    }
+  };
 
   const fetchTransactions = useCallback(async (fetchAddress: string, before?: string) => {
     setIsFetchingMore(true);
@@ -57,19 +77,29 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         }
         const data = await res.json();
         
-        setAllTransactions(prev => {
-            const existingSigs = new Set(prev.map(t => t.signature));
-            const newTxs = data.transactions.filter((tx: FlattenedTransaction) => !existingSigs.has(tx.signature));
-            return [...prev, ...newTxs];
-        });
+        const newTxs = data.transactions.filter((tx: FlattenedTransaction) => !allTransactions.some(t => t.signature === tx.signature));
+
+        setAllTransactions(prev => [...prev, ...newTxs]);
         setNextSignature(data.nextCursor);
+
+        // After fetching transactions, fetch balances for new wallets
+        const newAddresses = new Set<string>();
+        newTxs.forEach((tx: FlattenedTransaction) => {
+            if (tx.from) newAddresses.add(tx.from);
+            if (tx.to) newAddresses.add(tx.to);
+        });
+        
+        const addressesToFetch = Array.from(newAddresses).filter(addr => !(addr in extraWalletBalances) && addr !== fetchAddress);
+        if (addressesToFetch.length > 0) {
+           await fetchBalances(addressesToFetch);
+        }
 
     } catch (e: any) {
         setError(e.message);
     } finally {
         setIsFetchingMore(false);
     }
-  }, []);
+  }, [allTransactions, extraWalletBalances]);
 
   
   useEffect(() => {
@@ -77,6 +107,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setIsLoading(true);
         setError(null);
         setAllTransactions([]);
+        setExtraWalletBalances({});
         setNextSignature(null);
 
         try {
@@ -272,6 +303,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     walletAddress={address}
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
+                    extraWalletBalances={extraWalletBalances}
                 />
             </TabsContent>
         </Tabs>
