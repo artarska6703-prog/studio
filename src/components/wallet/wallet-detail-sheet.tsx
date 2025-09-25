@@ -18,7 +18,8 @@ async function copyToClipboard(text: string): Promise<boolean> {
     const textArea = document.createElement("textarea");
     textArea.value = text;
 
-    textArea.style.position = "fixed";
+    // Make the textarea invisible
+    textArea.style.position = "fixed"; 
     textArea.style.top = "0";
     textArea.style.left = "0";
     textArea.style.width = "2em";
