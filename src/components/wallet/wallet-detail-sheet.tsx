@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, ExternalLink } from 'lucide-react';
+import { Copy, Check, ExternalLink, Loader2 } from 'lucide-react';
 import { shortenAddress } from '@/lib/solana-utils';
 import { useToast } from '@/hooks/use-toast';
 import { WalletDetails, FlattenedTransaction, Transaction } from '@/lib/types';
@@ -131,7 +131,7 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
     const { toast } = useToast();
     const [copied, setCopied] = useState(false);
     const [details, setDetails] = useState<WalletDetails | null>(null);
-    const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]);
+    const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]); // This is now unused for data fetching but kept for stats
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -139,28 +139,16 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
             const fetchData = async () => {
                 setIsLoading(true);
                 setDetails(null);
-                setTransactions([]);
                 try {
-                    const [detailsRes, txRes] = await Promise.all([
-                        fetch(`/api/wallet/${address}/details`),
-                        fetch(`/api/wallet/${address}/transactions?limit=50`)
-                    ]);
+                    const detailsRes = await fetch(`/api/wallet/${address}/details`);
                     
                     if (!detailsRes.ok) {
                         const errorData = await detailsRes.json();
                         throw new Error(errorData.message || `Failed to fetch wallet details. Status: ${detailsRes.status}`);
                     }
-                    if (!txRes.ok) {
-                        const errorData = await txRes.json();
-                        throw new Error(errorData.message || `Failed to fetch wallet transactions. Status: ${txRes.status}`);
-                    }
-
+                    
                     const detailsData = await detailsRes.json();
-                    const txData = await txRes.json();
-
                     setDetails(detailsData);
-                    setTransactions(txData.transactions || []);
-
                 } catch (error: any) {
                     console.error(error);
                     toast({
@@ -189,43 +177,15 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         });
     };
 
-    const walletStats = useMemo(() => {
-        if (!transactions || transactions.length === 0) {
-            return {
-                firstTx: null,
-                lastTx: null,
-                incomingCount: 0,
-                outgoingCount: 0,
-                incomingVolume: [],
-                outgoingVolume: []
-            };
-        }
-        
-        const sortedTxs = [...transactions].sort((a, b) => (a.blockTime || 0) - (b.blockTime || 0));
-        const incoming = transactions.filter(tx => tx.type === 'received');
-        const outgoing = transactions.filter(tx => tx.type === 'sent');
-
-        const aggregateVolume = (txs: FlattenedTransaction[]) => {
-            const volumeMap: Record<string, number> = {};
-            txs.forEach(tx => {
-                if (tx?.valueUSD && tx.valueUSD > 0) {
-                    const symbol = tx?.symbol || shortenAddress(tx?.mint || 'Unknown', 4);
-                    volumeMap[symbol] = (volumeMap[symbol] || 0) + tx.valueUSD;
-                }
-            });
-            return Object.entries(volumeMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
-        }
-
-        const lastTx = sortedTxs[sortedTxs.length - 1];
-        return {
-            firstTx: sortedTxs[0]?.blockTime ? new Date(sortedTxs[0].blockTime * 1000) : null,
-            lastTx: lastTx?.blockTime ? new Date(lastTx.blockTime * 1000) : null,
-            incomingCount: incoming.length,
-            outgoingCount: outgoing.length,
-            incomingVolume: aggregateVolume(incoming),
-            outgoingVolume: aggregateVolume(outgoing)
-        };
-    }, [transactions]);
+    // Note: walletStats is now non-functional as we no longer fetch transactions.
+    const walletStats = {
+        firstTx: null,
+        lastTx: null,
+        incomingCount: 0,
+        outgoingCount: 0,
+        incomingVolume: [],
+        outgoingVolume: []
+    };
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -245,64 +205,49 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                         </div>
                     </SheetTitle>
                     <SheetDescription>
-                        A summary of this wallet's balance, holdings, and recent activity.
+                        A summary of this wallet's balance and token holdings.
                     </SheetDescription>
                 </SheetHeader>
-
-                <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                    <div className="space-y-2">
-                        <StatItem label="Balance" isLoading={isLoading} value={details ? `${details.sol.balance.toFixed(4)} SOL (${formatCurrency(details.sol.valueUSD || 0)})` : ''} />
-                        <Accordion type="single" collapsible>
-                            <AccordionItem value="tokens" className="border-none">
-                                <AccordionTrigger className="flex justify-between items-center text-sm py-1 font-medium text-muted-foreground hover:no-underline">
-                                    <span>Token Balance</span>
-                                    {isLoading ? <Skeleton className="h-5 w-16" /> : <span className="font-medium text-foreground">({details?.tokens.length || 0} Tokens)</span>}
-                                </AccordionTrigger>
-                                <AccordionContent className="pt-2">
-                                     {details && details.tokens.length > 0 ? (
-                                        <div className="space-y-2">
-                                            {details.tokens.slice(0,5).map(token => (
-                                                <div key={token.mint} className="flex justify-between items-center text-xs">
-                                                    <span>{token.symbol}</span>
-                                                    <span className="font-code">{token.amount.toFixed(2)} ({formatCurrency(token.valueUSD || 0)})</span>
-                                                </div>
-                                            ))}
-                                            {details.tokens.length > 5 && <p className="text-xs text-center text-muted-foreground">...and {details.tokens.length - 5} more.</p>}
-                                        </div>
-                                     ) : (
-                                        <p className="text-xs text-muted-foreground text-center">No other tokens held.</p>
-                                     )}
-                                </AccordionContent>
-                            </AccordionItem>
-                        </Accordion>
-                        <StatItem label="Risk Score" value={"Coming Soon"} />
+                
+                {isLoading ? (
+                    <div className="flex items-center justify-center flex-1">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                         <StatItem label="First Tx" isLoading={isLoading} value={walletStats.firstTx ? format(walletStats.firstTx, 'MMM d, yyyy') : 'N/A'} />
-                         <StatItem label="Last Tx" isLoading={isLoading} value={walletStats.lastTx ? format(walletStats.lastTx, 'MMM d, yyyy') : 'N/A'} />
-                         <StatItem label="Incoming Tx Count" isLoading={isLoading} value={walletStats.incomingCount.toLocaleString()} />
-                         <StatItem label="Outgoing Tx Count" isLoading={isLoading} value={walletStats.outgoingCount.toLocaleString()} />
+                ) : (
+                    <div className="p-4 space-y-4 overflow-y-auto flex-1">
+                        <div className="space-y-2">
+                            <StatItem label="SOL Balance" isLoading={isLoading} value={details ? `${details.sol.balance.toFixed(4)} SOL` : ''} />
+                            <StatItem label="SOL Value (USD)" isLoading={isLoading} value={details ? formatCurrency(details.sol.valueUSD || 0) : ''} />
+                            <Accordion type="single" collapsible>
+                                <AccordionItem value="tokens" className="border-none">
+                                    <AccordionTrigger className="flex justify-between items-center text-sm py-1 font-medium text-muted-foreground hover:no-underline">
+                                        <span>Token Holdings</span>
+                                        {isLoading ? <Skeleton className="h-5 w-16" /> : <span className="font-medium text-foreground">({details?.tokens.length || 0} Tokens)</span>}
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pt-2">
+                                        {details && details.tokens.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {details.tokens.slice(0,5).map(token => (
+                                                    <div key={token.mint} className="flex justify-between items-center text-xs">
+                                                        <span>{token.symbol}</span>
+                                                        <span className="font-code">{token.amount.toFixed(2)} ({formatCurrency(token.valueUSD || 0)})</span>
+                                                    </div>
+                                                ))}
+                                                {details.tokens.length > 5 && <p className="text-xs text-center text-muted-foreground">...and {details.tokens.length - 5} more.</p>}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground text-center">No other tokens held.</p>
+                                        )}
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
+                        </div>
+                        <div className="pt-4 text-center text-sm text-muted-foreground">
+                            Transaction stats have been moved to the full wallet view for faster performance.
+                        </div>
                     </div>
+                )}
 
-                    {isLoading ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="flex flex-col items-center">
-                                <h3 className="text-md font-semibold mb-2">Incoming Volume</h3>
-                                <Skeleton className="w-48 h-48 rounded-full" />
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <h3 className="text-md font-semibold mb-2">Outgoing Volume</h3>
-                                <Skeleton className="w-48 h-48 rounded-full" />
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 gap-4 pt-4">
-                             <VolumeChart data={walletStats.incomingVolume} title="Incoming Volume" />
-                             <VolumeChart data={walletStats.outgoingVolume} title="Outgoing Volume" />
-                        </div>
-                    )}
-                </div>
                 <div className="p-2 border-t mt-auto">
                      <Button variant="ghost" className="w-full justify-center" asChild>
                         <a href={`/wallet/${address}`} target="_blank" rel="noopener noreferrer">
