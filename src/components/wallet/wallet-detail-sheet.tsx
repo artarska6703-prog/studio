@@ -8,13 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Copy, Check, ExternalLink, Loader2 } from 'lucide-react';
 import { shortenAddress } from '@/lib/solana-utils';
 import { useToast } from '@/hooks/use-toast';
-import { WalletDetails, FlattenedTransaction, Transaction } from '@/lib/types';
+import { WalletDetails } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { format } from 'date-fns';
-
 
 // Fallback copy function for restrictive environments
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -45,7 +42,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
     }
 }
 
-
 interface WalletDetailSheetProps {
   address: string;
   open: boolean;
@@ -58,63 +54,6 @@ const StatItem = ({ label, value, isLoading }: { label: string, value: string | 
         {isLoading ? <Skeleton className="h-5 w-24" /> : <span className="font-medium">{value}</span>}
     </div>
 );
-
-const VolumeChart = ({ data, title }: { data: { name: string, value: number }[], title: string }) => {
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-    const totalVolume = data.reduce((acc, entry) => acc + entry.value, 0);
-
-    if (data.length === 0) {
-        return (
-             <div className="flex flex-col items-center">
-                <h3 className="text-md font-semibold mb-2">{title}</h3>
-                <div className="w-full h-48 relative flex items-center justify-center flex-col">
-                    <span className="text-xl font-bold">{formatCurrency(0)}</span>
-                    <span className="text-xs text-muted-foreground">Total</span>
-                </div>
-            </div>
-        )
-    }
-
-    return (
-        <div className="flex flex-col items-center">
-            <h3 className="text-md font-semibold mb-2">{title}</h3>
-            <div className="w-full h-48 relative">
-                 <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={80}
-                            innerRadius={60}
-                            fill="#8884d8"
-                            dataKey="value"
-                            stroke="none"
-                        >
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Pie>
-                        <Tooltip 
-                            contentStyle={{ 
-                                background: 'hsl(var(--background))',
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: 'var(--radius)',
-                            }}
-                            formatter={(value: number) => [formatCurrency(value), "Volume"]}
-                        />
-                    </PieChart>
-                </ResponsiveContainer>
-                 <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                    <span className="text-xl font-bold">{formatCurrency(totalVolume)}</span>
-                    <span className="text-xs text-muted-foreground">Total</span>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 
 export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailSheetProps) {
     const { toast } = useToast();
