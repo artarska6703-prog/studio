@@ -62,7 +62,7 @@ const WalletRelationshipDiagnosticDashboard = () => {
             avoidOverlap: 0.7,
         };
 
-        const { nodes, links } = processTransactions(transactions, walletAddress, 5);
+        const { nodes, links } = processTransactions(transactions, walletAddress, 5, null, {});
         setDiagnosticData({
             nodes,
             links,
@@ -94,7 +94,7 @@ const WalletRelationshipDiagnosticDashboard = () => {
             </div>
             {walletAddress && (
               <Button asChild variant="outline">
-                <Link href={`/wallet/${walletAddress}`}>
+                <Link href={`/wallet/${walletAddress}?tab=graph`}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Graph
                 </Link>
@@ -104,7 +104,7 @@ const WalletRelationshipDiagnosticDashboard = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           <div className="lg:col-span-2 xl:col-span-3">
-            <DataProcessingDiagnostic />
+            <DataProcessingDiagnostic scenario={scenario} />
           </div>
           <PhysicsDiagnostic diagnosticData={diagnosticData} />
           <NetworkStructureDiagnostic diagnosticData={diagnosticData} />
