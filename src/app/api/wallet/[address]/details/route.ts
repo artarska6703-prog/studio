@@ -38,12 +38,6 @@ export async function GET(
     }
     const solAmount = lamports / LAMPORTS_PER_SOL;
     
-    // Always fetch SOL price first and independently
-    const solPriceData = await getTokenPrices([SOL_MINT]);
-    const solPrice = solPriceData[SOL_MINT] ?? 0;
-    const solValueUSD = solAmount * solPrice;
-    console.log(`✅ [API DETAILS] Fetched SOL price for ${address}: ${solPrice}`);
-
     // Assets
     const assets = await helius.rpc.getAssetsByOwner({
       ownerAddress: address,
@@ -51,17 +45,27 @@ export async function GET(
       limit: 1000,
     });
 
-    // Collect mints of other fungible tokens
-    const otherMints: string[] = (assets?.items ?? [])
-      .filter(a => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
-      .map(a => a.id);
-
-    // Fetch prices for other tokens if they exist
-    const otherTokenPrices = otherMints.length > 0 ? await getTokenPrices(otherMints) : {};
+    // Collect mints of all fungible tokens, ensuring SOL is always included
+    const tokenMints: string[] = [SOL_MINT];
+    if (assets && assets.items) {
+      assets.items.forEach(asset => {
+        if (
+          asset.interface === 'FungibleToken' &&
+          asset.token_info?.balance &&
+          asset.id !== SOL_MINT // Avoid duplicates
+        ) {
+          tokenMints.push(asset.id);
+        }
+      });
+    }
     
-    // Combine price data
-    const prices = { ...solPriceData, ...otherTokenPrices };
+    // Fetch prices for all required tokens at once
+    const prices = await getTokenPrices(Array.from(new Set(tokenMints)));
     console.log("✅ [API DETAILS] Fetched all prices object for", address, prices);
+    
+    const solPrice = prices[SOL_MINT] ?? 0;
+    const solValueUSD = solAmount * solPrice;
+    console.log(`✅ [API DETAILS] Final SOL value for ${address}:`, { solAmount, solPrice, solValueUSD });
 
     // Build tokens list (excluding SOL, which is handled separately)
     const tokens: TokenHolding[] = (assets?.items ?? [])
@@ -85,7 +89,6 @@ export async function GET(
       });
 
     console.log("✅ [API DETAILS] Final token response:", tokens.map(t => ({ symbol: t.symbol, value: t.valueUSD })));
-    console.log("✅ [API DETAILS] Final SOL value:", { solAmount, solPrice, solValueUSD });
 
     const body: WalletDetails = {
       address,
