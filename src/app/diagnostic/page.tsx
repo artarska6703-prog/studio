@@ -89,7 +89,7 @@ const WalletRelationshipDiagnosticDashboard = () => {
       <div className="p-4 md:p-6 lg:p-8 bg-muted/20 min-h-screen">
         <div className="flex items-center justify-between mb-6">
             <div className="flex flex-col">
-              <h1 className="text-3xl font-bold font-headline tracking-tighter">Wallet Map Diagnostics</h1>
+              <h1 className="text-3xl font-bold font-headline tracking-tighter">Wallet Network Diagnostics</h1>
               <p className="text-muted-foreground">Displaying data for scenario: <span className="font-semibold capitalize text-primary">{scenario}</span></p>
             </div>
             {walletAddress && (
