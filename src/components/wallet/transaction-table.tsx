@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import type { TokenHolding, FlattenedTransaction } from '@/lib/types';
+import type { TokenHolding, FlattenedTransaction } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { shortenAddress } from '@/lib/solana-utils';
@@ -27,23 +27,37 @@ import { AddressFilter, AddressFilterPopover } from './address-filter-popover';
 // Fallback copy function for restrictive environments
 async function copyToClipboard(text: string): Promise<boolean> {
     try {
+        // First, try the modern Clipboard API
         await navigator.clipboard.writeText(text);
         return true;
     } catch (err) {
+        // If that fails, fall back to the legacy execCommand
         console.warn("Clipboard API failed, falling back to execCommand.", err);
         const textArea = document.createElement("textarea");
         textArea.value = text;
+        
+        // Make the textarea invisible
         textArea.style.position = "fixed"; 
-        textArea.style.opacity = "0";
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.width = "2em";
+        textArea.style.height = "2em";
+        textArea.style.padding = "0";
+        textArea.style.border = "none";
+        textArea.style.outline = "none";
+        textArea.style.boxShadow = "none";
+        textArea.style.background = "transparent";
+
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
+
         try {
             const successful = document.execCommand('copy');
             document.body.removeChild(textArea);
             return successful;
         } catch (err) {
-            console.error("Fallback copy failed:", err);
+            console.error("Fallback copy method failed:", err);
             document.body.removeChild(textArea);
             return false;
         }
