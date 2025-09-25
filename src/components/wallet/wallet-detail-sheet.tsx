@@ -18,41 +18,30 @@ import { format } from 'date-fns';
 
 // Fallback copy function for restrictive environments
 async function copyToClipboard(text: string): Promise<boolean> {
-    try {
-        // First, try the modern Clipboard API
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch (err) {
-        // If that fails, fall back to the legacy execCommand
-        console.warn("Clipboard API failed, falling back to execCommand.", err);
+    if (!navigator.clipboard) {
+        // Fallback for http or older browsers
         const textArea = document.createElement("textarea");
         textArea.value = text;
-        
-        // Make the textarea invisible
         textArea.style.position = "fixed"; 
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.width = "2em";
-        textArea.style.height = "2em";
-        textArea.style.padding = "0";
-        textArea.style.border = "none";
-        textArea.style.outline = "none";
-        textArea.style.boxShadow = "none";
-        textArea.style.background = "transparent";
-
+        textArea.style.opacity = "0";
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-
         try {
             const successful = document.execCommand('copy');
             document.body.removeChild(textArea);
             return successful;
         } catch (err) {
-            console.error("Fallback copy method failed:", err);
             document.body.removeChild(textArea);
             return false;
         }
+    }
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch (err) {
+        console.error("Async clipboard write failed:", err);
+        return false;
     }
 }
 
@@ -164,16 +153,20 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         }
     }, [address, open, toast, onOpenChange]);
 
-    const handleCopy = () => {
-        copyToClipboard(address).then((success) => {
-            if (success) {
-                setCopied(true);
-                toast({ title: 'Address copied to clipboard' });
-                setTimeout(() => setCopied(false), 2000);
-            } else {
-                toast({ variant: 'destructive', title: 'Could not copy address' });
-            }
-        });
+    const handleCopy = async () => {
+      try {
+        const result = await copyToClipboard(address);
+        if (result) {
+          setCopied(true);
+          toast({ title: 'Address copied to clipboard' });
+          setTimeout(() => setCopied(false), 2000);
+        } else {
+          throw new Error('Clipboard access denied');
+        }
+      } catch (error) {
+        console.error("Copy failed:", error);
+        toast({ variant: 'destructive', title: 'Could not copy address' });
+      }
     };
 
     return (
