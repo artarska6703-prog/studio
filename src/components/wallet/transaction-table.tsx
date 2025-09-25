@@ -157,6 +157,19 @@ const TransactionRowActions = ({ signature }: { signature: string }) => {
     )
 }
 
+interface TransactionTableProps {
+  transactions: FlattenedTransaction[];
+  allTokens: TokenHolding[];
+  walletAddress: string;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  totalTransactions: number;
+  dateRange: DateRange | undefined;
+  setDateRange: (dateRange: DateRange | undefined) => void;
+}
+
+
 export function TransactionTable({ 
     transactions, 
     allTokens, 
@@ -186,6 +199,7 @@ export function TransactionTable({
         symbol: 'SOL',
         amount: 0,
         decimals: 9,
+        price: 0,
         valueUSD: 0,
         tokenStandard: 'Native' as any
     });
@@ -394,7 +408,7 @@ export function TransactionTable({
             </TableBody>
           </Table>
         </div>
-        {hasMore && (
+        {hasMore && !useMockData && (
             <div className="p-4 border-t text-center">
                 <Button onClick={onLoadMore} disabled={isLoadingMore} variant="secondary">
                      {isLoadingMore ? "Loading..." : "Load More Transactions"}
