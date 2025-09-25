@@ -255,14 +255,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                              <VolumeChart data={walletStats.outgoingVolume} title="Outgoing Volume" />
                         </div>
                     )}
-                     <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="breadcrumbs">
-                            <AccordionTrigger>Breadcrumbs Network</AccordionTrigger>
-                            <AccordionContent>
-                                Coming soon.
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
                 </div>
                 <div className="p-2 border-t mt-auto">
                      <Button variant="ghost" className="w-full justify-center" asChild>
@@ -275,3 +267,5 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         </Sheet>
     );
 }
+
+    
