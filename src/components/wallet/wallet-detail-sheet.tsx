@@ -131,7 +131,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
     const { toast } = useToast();
     const [copied, setCopied] = useState(false);
     const [details, setDetails] = useState<WalletDetails | null>(null);
-    const [transactions, setTransactions] = useState<FlattenedTransaction[]>([]); // This is now unused for data fetching but kept for stats
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -175,16 +174,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                 toast({ variant: 'destructive', title: 'Could not copy address' });
             }
         });
-    };
-
-    // Note: walletStats is now non-functional as we no longer fetch transactions.
-    const walletStats = {
-        firstTx: null,
-        lastTx: null,
-        incomingCount: 0,
-        outgoingCount: 0,
-        incomingVolume: [],
-        outgoingVolume: []
     };
 
     return (
