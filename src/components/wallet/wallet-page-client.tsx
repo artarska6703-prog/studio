@@ -77,14 +77,17 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         }
         const data = await res.json();
         
-        const newTxs = data.transactions.filter((tx: FlattenedTransaction) => !allTransactions.some(t => t.signature === tx.signature));
+        setAllTransactions(prev => {
+            const existingSigs = new Set(prev.map(tx => tx.signature));
+            const newTxs = data.transactions.filter((tx: FlattenedTransaction) => !existingSigs.has(tx.signature));
+            return [...prev, ...newTxs];
+        });
 
-        setAllTransactions(prev => [...prev, ...newTxs]);
         setNextSignature(data.nextCursor);
 
         // After fetching transactions, fetch balances for new wallets
         const newAddresses = new Set<string>();
-        newTxs.forEach((tx: FlattenedTransaction) => {
+        data.transactions.forEach((tx: FlattenedTransaction) => {
             if (tx.from) newAddresses.add(tx.from);
             if (tx.to) newAddresses.add(tx.to);
         });
@@ -99,7 +102,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } finally {
         setIsFetchingMore(false);
     }
-  }, [allTransactions, extraWalletBalances]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   
   useEffect(() => {
@@ -133,8 +137,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setNextSignature(null);
         const MOCK_SOL_PRICE = 150;
         setWalletDetails({ address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [
-            { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', symbol: 'USDC', amount: 500.50, decimals: 6, valueUSD: 500.50, price: 1, tokenStandard: 'Fungible' },
-            { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', name: 'Bonk', symbol: 'BONK', amount: 1000000, decimals: 5, valueUSD: 25.30, price: 0.0000253, tokenStandard: 'Fungible' }
+            { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', symbol: 'USDC', amount: 500.50, decimals: 6, valueUSD: 500.50, price: 1, tokenStandard: 'Fungible' as any },
+            { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', name: 'Bonk', symbol: 'BONK', amount: 1000000, decimals: 5, valueUSD: 25.30, price: 0.0000253, tokenStandard: 'Fungible' as any }
         ] });
     }
   }, [address, useMockData, fetchTransactions]);
