@@ -92,7 +92,7 @@ export function WalletHeader({ address }: WalletHeaderProps) {
                 <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={handleCopy} className="shrink-0">
                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                    </Button> grinning face with smiling eyes
+                    </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                     <p>Copy address</p>
