@@ -37,6 +37,12 @@ export async function GET(
       if (!String(e?.message || "").includes("could not find account")) throw e;
     }
     const solAmount = lamports / LAMPORTS_PER_SOL;
+    
+    // Always fetch SOL price first and independently
+    const solPriceData = await getTokenPrices([SOL_MINT]);
+    const solPrice = solPriceData[SOL_MINT] ?? 0;
+    const solValueUSD = solAmount * solPrice;
+    console.log(`✅ [API DETAILS] Fetched SOL price for ${address}: ${solPrice}`);
 
     // Assets
     const assets = await helius.rpc.getAssetsByOwner({
@@ -45,26 +51,24 @@ export async function GET(
       limit: 1000,
     });
 
-    // Collect mints (always include SOL)
-    const mints: string[] = [SOL_MINT];
-    for (const a of assets?.items ?? []) {
-      if (a.interface === "FungibleToken" && a.token_info?.balance) {
-        mints.push(a.id);
-      }
-    }
+    // Collect mints of other fungible tokens
+    const otherMints: string[] = (assets?.items ?? [])
+      .filter(a => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
+      .map(a => a.id);
 
-    const prices = await getTokenPrices(mints);
-    console.log("✅ [API DETAILS] Fetched prices object:", prices);
+    // Fetch prices for other tokens if they exist
+    const otherTokenPrices = otherMints.length > 0 ? await getTokenPrices(otherMints) : {};
+    
+    // Combine price data
+    const prices = { ...solPriceData, ...otherTokenPrices };
+    console.log("✅ [API DETAILS] Fetched all prices object for", address, prices);
 
-    const solPrice = prices[SOL_MINT] ?? 0;
-    const solValueUSD = solAmount * solPrice;
-
-    // Build tokens list (no USD filter)
+    // Build tokens list (excluding SOL, which is handled separately)
     const tokens: TokenHolding[] = (assets?.items ?? [])
-      .filter(a => a.interface === "FungibleToken" && a.token_info?.balance)
+      .filter(a => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
       .map(a => {
         const decimals = a.token_info?.decimals ?? 0;
-        const raw = a.token_info?.balance ?? 0; // could be raw units
+        const raw = a.token_info?.balance ?? 0;
         const amount = raw / Math.pow(10, decimals);
         const price = prices[a.id] ?? 0;
         return {
