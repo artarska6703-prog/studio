@@ -15,31 +15,35 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 
 // Fallback copy function for restrictive environments
 async function copyToClipboard(text: string): Promise<boolean> {
-    if (!navigator.clipboard) {
-        // Fallback for http or older browsers
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed"; 
-        textArea.style.opacity = "0";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-            return successful;
-        } catch (err) {
-            document.body.removeChild(textArea);
-            return false;
-        }
-    }
+  return new Promise((resolve) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
     try {
-        await navigator.clipboard.writeText(text);
-        return true;
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      resolve(successful);
     } catch (err) {
-        console.error("Async clipboard write failed:", err);
-        return false;
+      console.error("Fallback copy failed:", err);
+      document.body.removeChild(textArea);
+      resolve(false);
     }
+  });
 }
 
 interface WalletDetailSheetProps {
