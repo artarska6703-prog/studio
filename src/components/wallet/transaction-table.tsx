@@ -24,20 +24,36 @@ import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
 import { AddressFilter, AddressFilterPopover } from './address-filter-popover';
 
-interface TransactionTableProps {
-  transactions: FlattenedTransaction[];
-  allTokens: TokenHolding[];
-  walletAddress: string;
-  onLoadMore: () => void;
-  hasMore: boolean;
-  isLoadingMore: boolean;
-  totalTransactions: number;
-  dateRange: DateRange | undefined;
-  setDateRange: (date: DateRange | undefined) => void;
+// Fallback copy function for restrictive environments
+async function copyToClipboard(text: string): Promise<boolean> {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch (err) {
+        console.warn("Clipboard API failed, falling back to execCommand.", err);
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed"; 
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            return successful;
+        } catch (err) {
+            console.error("Fallback copy failed:", err);
+            document.body.removeChild(textArea);
+            return false;
+        }
+    }
 }
+
 
 const AddressDisplay = ({ address }: { address: string | null }) => {
     const [copied, setCopied] = useState(false);
+    const { toast } = useToast();
     
     if (!address) {
         return <span className="text-muted-foreground">-</span>;
@@ -46,9 +62,15 @@ const AddressDisplay = ({ address }: { address: string | null }) => {
     const handleCopy = (e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
-        navigator.clipboard.writeText(address);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        copyToClipboard(address).then((success) => {
+          if (success) {
+            setCopied(true);
+            toast({ title: "Address copied." });
+            setTimeout(() => setCopied(false), 2000);
+          } else {
+            toast({ variant: 'destructive', title: "Copy failed." });
+          }
+        });
     };
 
     return (
@@ -90,8 +112,13 @@ const TransactionRowActions = ({ signature }: { signature: string }) => {
 
     const copySignature = (e: React.MouseEvent | Event) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(signature);
-        toast({ title: "Signature copied to clipboard." });
+        copyToClipboard(signature).then(success => {
+            if (success) {
+                toast({ title: "Signature copied to clipboard." });
+            } else {
+                toast({ variant: 'destructive', title: "Copy failed." });
+            }
+        });
     };
 
     return (

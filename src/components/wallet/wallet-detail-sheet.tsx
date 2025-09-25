@@ -15,6 +15,33 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 
+
+// Fallback copy function for restrictive environments
+async function copyToClipboard(text: string): Promise<boolean> {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch (err) {
+        console.warn("Clipboard API failed, falling back to execCommand.", err);
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed"; 
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            return successful;
+        } catch (err) {
+            console.error("Fallback copy failed:", err);
+            document.body.removeChild(textArea);
+            return false;
+        }
+    }
+}
+
 interface WalletDetailSheetProps {
   address: string;
   open: boolean;
@@ -136,10 +163,15 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
     }, [address, open, toast, onOpenChange]);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(address);
-        setCopied(true);
-        toast({ title: 'Address copied to clipboard' });
-        setTimeout(() => setCopied(false), 2000);
+        copyToClipboard(address).then((success) => {
+            if (success) {
+                setCopied(true);
+                toast({ title: 'Address copied to clipboard' });
+                setTimeout(() => setCopied(false), 2000);
+            } else {
+                toast({ variant: 'destructive', title: 'Could not copy address' });
+            }
+        });
     };
 
     const walletStats = useMemo(() => {
@@ -267,5 +299,3 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         </Sheet>
     );
 }
-
-    

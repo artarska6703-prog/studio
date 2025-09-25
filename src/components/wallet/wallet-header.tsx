@@ -8,6 +8,33 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 
+// Fallback copy function for restrictive environments
+async function copyToClipboard(text: string): Promise<boolean> {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch (err) {
+        console.warn("Clipboard API failed, falling back to execCommand.", err);
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed"; 
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            return successful;
+        } catch (err) {
+            console.error("Fallback copy failed:", err);
+            document.body.removeChild(textArea);
+            return false;
+        }
+    }
+}
+
+
 interface WalletHeaderProps {
   address: string;
 }
@@ -18,10 +45,15 @@ export function WalletHeader({ address }: WalletHeaderProps) {
   const { toast } = useToast();
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    toast({ title: "Address copied to clipboard." });
-    setTimeout(() => setCopied(false), 2000);
+    copyToClipboard(address).then((success) => {
+        if (success) {
+            setCopied(true);
+            toast({ title: "Address copied to clipboard." });
+            setTimeout(() => setCopied(false), 2000);
+        } else {
+            toast({ variant: 'destructive', title: "Could not copy address." });
+        }
+    });
   };
 
   const handleBookmark = () => {
@@ -60,7 +92,7 @@ export function WalletHeader({ address }: WalletHeaderProps) {
                 <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={handleCopy} className="shrink-0">
                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                    </Button>
+                    </Button> grinning face with smiling eyes
                 </TooltipTrigger>
                 <TooltipContent>
                     <p>Copy address</p>
