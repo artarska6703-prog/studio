@@ -314,3 +314,5 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         </Sheet>
     );
 }
+
+    
