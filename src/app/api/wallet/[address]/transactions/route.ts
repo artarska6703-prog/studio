@@ -50,7 +50,7 @@ function toFlattened(
           to: t.toUserAccount || null,
           by: tx.feePayer,
           instruction: tx.type,
-          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean))).filter(a => a !== walletAddress) as string[],
+          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(a => a) as string[])).filter(a => a !== walletAddress),
           valueUSD: Math.abs(signedAmount) * price,
         });
         isInteractionAdded = true;
@@ -83,7 +83,7 @@ function toFlattened(
           to: t.toUserAccount || null,
           by: tx.feePayer,
           instruction: tx.type,
-          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean))).filter(a => a !== walletAddress) as string[],
+          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(a => a) as string[])).filter(a => a !== walletAddress),
           valueUSD: Math.abs(signedTokenAmount) * price,
           tokenAmount: signedTokenAmount,
           tokenSymbol: symbol,
