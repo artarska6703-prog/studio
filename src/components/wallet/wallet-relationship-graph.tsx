@@ -252,7 +252,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
         
         const networkInstance = new Network(containerRef.current, data, options);
 
-        networkInstance.on('doubleClick', (params) => {
+        networkInstance.on('click', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
                 setExpandedNodeIds(prev => {
@@ -263,7 +263,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
             }
         });
 
-        networkInstance.on('click', (params) => {
+        networkInstance.on('doubleClick', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
                 setSelectedNodeAddress(nodeId);
