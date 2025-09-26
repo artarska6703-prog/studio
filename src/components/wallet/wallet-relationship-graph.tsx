@@ -220,8 +220,8 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
   // Effect for initializing and managing the network instance
   useEffect(() => {
-    if (isLoading || nodes.length === 0 || !containerRef.current) {
-        return;
+    if (!containerRef.current || isLoading) {
+      return;
     }
     
     const options: Options = {
@@ -349,4 +349,3 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
-
