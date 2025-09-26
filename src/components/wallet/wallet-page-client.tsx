@@ -27,6 +27,7 @@ import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
 import { useToast } from "@/hooks/use-toast";
 import { shortenAddress } from "@/lib/solana-utils";
+import { useSearchParams } from "next/navigation";
 
 const TXN_PAGE_SIZE = 100;
 
@@ -37,6 +38,7 @@ type WalletPageViewProps = {
 };
 
 export function WalletPageView({ address }: WalletPageViewProps) {
+  const searchParams = useSearchParams();
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [extraWalletBalances, setExtraWalletBalances] = useState<Record<string, number>>({});
@@ -50,6 +52,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const { toast } = useToast();
   const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'portfolio');
+
 
   const fetchBalances = async (addresses: string[], tokenMint?: string) => {
     if (addresses.length === 0) return;
@@ -240,7 +244,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             </Alert>
         )}
 
-        <Tabs defaultValue="portfolio" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
                 <TabsTrigger value="transactions">Transactions</TabsTrigger>
