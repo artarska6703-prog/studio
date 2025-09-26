@@ -39,6 +39,8 @@ function toFlattened(
         const outgoing = t.fromUserAccount === walletAddress;
         const signedAmount = outgoing ? -amount : amount;
         const price = prices[SOL_MINT] ?? 0;
+        
+        const participants = [tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean) as string[];
 
         out.push({
           ...tx,
@@ -51,7 +53,7 @@ function toFlattened(
           to: t.toUserAccount || null,
           by: tx.feePayer,
           instruction: tx.type,
-          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(a => a) as string[])).filter(a => a !== walletAddress),
+          interactedWith: Array.from(new Set(participants)).filter(a => a !== walletAddress),
           valueUSD: Math.abs(signedAmount) * price,
         });
         isInteractionAdded = true;
@@ -72,6 +74,7 @@ function toFlattened(
         const signedTokenAmount = outgoing ? -tokenAmount : tokenAmount;
         const price = prices[mint] ?? 0;
         const symbol = tokenMap.get(mint) || (mint.slice(0, 4) + '...');
+        const participants = [tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean) as string[];
 
         out.push({
           ...tx,
@@ -84,7 +87,7 @@ function toFlattened(
           to: t.toUserAccount || null,
           by: tx.feePayer,
           instruction: tx.type,
-          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean) as string[])).filter(a => a !== walletAddress),
+          interactedWith: Array.from(new Set(participants)).filter(a => a !== walletAddress),
           valueUSD: Math.abs(signedTokenAmount) * price,
           tokenAmount: signedTokenAmount,
           tokenSymbol: symbol,

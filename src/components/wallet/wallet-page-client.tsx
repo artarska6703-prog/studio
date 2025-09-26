@@ -113,7 +113,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } finally {
         setIsFetchingMore(false);
     }
-  }, []);
+  }, [extraWalletBalances]);
 
   const handleExpandNode = (nodeId: string) => {
     if (expandedNodeIds.has(nodeId)) {
@@ -168,7 +168,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             { mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', name: 'Bonk', symbol: 'BONK', amount: 1000000, decimals: 5, valueUSD: 25.30, price: 0.0000253, tokenStandard: 'Fungible' as any }
         ] });
     }
-  }, [address, useMockData, fetchTransactions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, useMockData]);
 
 
   const liveTransactions = useMemo(() => {
