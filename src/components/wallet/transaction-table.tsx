@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -213,18 +214,19 @@ export function TransactionTable({
     const minValue = parseFloat(debouncedMinValue);
     const validMinValue = isNaN(minValue) ? 0 : minValue;
 
-    return transactions.filter(tx => {
+    let preFilteredTxs = transactions;
+    if (tokenFilter !== 'all') {
+        preFilteredTxs = transactions.filter(tx => tx.tokenMint === tokenFilter || (tokenFilter === 'SOL' && tx.mint === 'So11111111111111111111111111111111111111112'));
+    }
+
+    return preFilteredTxs.filter(tx => {
         if (!tx) return false;
         
         if (validMinValue > 0 && (tx.valueUSD === null || Math.abs(tx.valueUSD) < validMinValue)) return false;
         
-        const tokenMatch = tokenFilter === 'all' || 
-                            (tokenFilter === 'sol' && tx.mint === 'So11111111111111111111111111111111111111112') ||
-                            (tokenFilter === 'spl' && tx.mint !== 'So11111111111111111111111111111111111111112');
-                            
         const directionMatch = directionFilter === 'all' ||
-                                (directionFilter === 'in' && tx.amount > 0) ||
-                                (directionFilter === 'out' && tx.amount < 0) ||
+                                (directionFilter === 'in' && (tx.to === walletAddress || (tx.type === 'program_interaction' && tx.interactedWith.includes(walletAddress) && tx.amount > 0))) ||
+                                (directionFilter === 'out' && (tx.from === walletAddress)) ||
                                 (directionFilter === 'program' && tx.type === 'program_interaction');
 
         
@@ -237,7 +239,6 @@ export function TransactionTable({
         const checkAddressFilters = (address: string | null, filters: AddressFilter[]) => {
             if (filters.length === 0) return true;
             if (!address) return false;
-            // For a transaction to be included, it must satisfy all filters
             return filters.every(filter => {
                 const addressMatch = address.toLowerCase().includes(filter.address.toLowerCase());
                 return filter.type === 'include' ? addressMatch : !addressMatch;
@@ -247,9 +248,9 @@ export function TransactionTable({
         const fromMatch = checkAddressFilters(tx.from, fromFilters);
         const toMatch = checkAddressFilters(tx.to, toFilters);
 
-        return tokenMatch && directionMatch && dateMatch && fromMatch && toMatch;
+        return directionMatch && dateMatch && fromMatch && toMatch;
     });
-  }, [transactions, tokenFilter, directionFilter, debouncedMinValue, dateRange, fromFilters, toFilters]);
+  }, [transactions, tokenFilter, directionFilter, debouncedMinValue, dateRange, fromFilters, toFilters, walletAddress]);
   
   const totalPages = useMemo(() => {
       const total = Math.ceil(filteredTransactions.length / rowsPerPage);
@@ -276,17 +277,19 @@ export function TransactionTable({
   }
   
   const getSymbol = (tx: FlattenedTransaction) => {
-      if(tx.mint && tokenMap.has(tx.mint)) {
-          return tokenMap.get(tx.mint)?.symbol || shortenAddress(tx.mint, 4);
+      if(tx.tokenMint && tokenMap.has(tx.tokenMint)) {
+          return tokenMap.get(tx.tokenMint)?.symbol || shortenAddress(tx.tokenMint, 4);
       }
       return tx.symbol || shortenAddress(tx.mint || '?', 4);
   }
   
   const formatAmount = (tx: FlattenedTransaction) => {
-    if (tx.type === 'program_interaction') return '-';
-    let amount = tx.amount;
+    if (tx.type === 'program_interaction' && !tx.tokenAmount) return '-';
+    
+    let amount = tx.tokenAmount ?? tx.amount;
     const absAmount = Math.abs(amount);
-    if (absAmount === 0) return '0.00';
+    if (absAmount === 0 && tx.type !== 'program_interaction') return '0.00';
+    if (absAmount === 0 && tx.type === 'program_interaction') return '-';
 
     const formatter = new Intl.NumberFormat('en-US', {
         minimumFractionDigits: 2,
@@ -315,12 +318,6 @@ export function TransactionTable({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="flex flex-wrap items-center gap-2 lg:col-span-2">
                  <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
-                    <Button variant={tokenFilter === 'all' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setTokenFilter('all')}>All</Button>
-                    <Button variant={tokenFilter === 'sol' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setTokenFilter('sol')}>SOL</Button>
-                    <Button variant={tokenFilter === 'spl' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setTokenFilter('spl')}>SPL</Button>
-                </div>
-                <Separator orientation="vertical" className="h-6 mx-2 hidden md:block"/>
-                <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
                     <Button variant={directionFilter === 'all' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setDirectionFilter('all')}>All</Button>
                     <Button variant={directionFilter === 'out' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setDirectionFilter('out')}>Sent</Button>
                      <Button variant={directionFilter === 'in' ? 'default' : 'ghost'} size="sm" className={cn("h-7")} onClick={() => setDirectionFilter('in')}>Received</Button>
@@ -371,7 +368,8 @@ export function TransactionTable({
             </TableHeader>
             <TableBody>
               {paginatedTransactions.length > 0 ? paginatedTransactions.map((tx, idx) => {
-                const isOut = tx.amount < 0;
+                const isOut = (tx.from === walletAddress) || (tx.type === 'program_interaction' && tx.tokenAmount !== undefined && tx.tokenAmount < 0);
+                const amount = tx.tokenAmount ?? tx.amount;
                 return (
                 <TableRow key={`${tx.signature}-${idx}`}>
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
@@ -386,8 +384,8 @@ export function TransactionTable({
                      <TableCell>
                         <AddressDisplay address={tx.to} />
                     </TableCell>
-                    <TableCell className={cn("text-right font-code whitespace-nowrap", tx.type === 'program_interaction' ? 'text-muted-foreground' : isOut ? 'text-red-500' : 'text-green-500')}>
-                        {tx.type !== 'program_interaction' && (isOut ? '-' : '+')}{formatAmount(tx)}
+                    <TableCell className={cn("text-right font-code whitespace-nowrap", tx.type === 'program_interaction' && !tx.tokenAmount ? 'text-muted-foreground' : isOut ? 'text-red-500' : 'text-green-500')}>
+                        {tx.type !== 'program_interaction' || tx.tokenAmount ? (isOut ? '-' : '+') : ''}{formatAmount(tx)}
                     </TableCell>
                     <TableCell className="text-right font-code text-muted-foreground">
                         {console.log("Tx valueUSD raw:", tx.valueUSD, "for signature", tx.signature)}

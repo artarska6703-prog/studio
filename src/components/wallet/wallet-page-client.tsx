@@ -26,6 +26,7 @@ import type { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
+import { useToast } from "@/hooks/use-toast";
 
 const TXN_PAGE_SIZE = 100;
 
@@ -40,13 +41,15 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [extraWalletBalances, setExtraWalletBalances] = useState<Record<string, number>>({});
   const [specificTokenBalances, setSpecificTokenBalances] = useState<Record<string, number>>({});
-  const [nextSignature, setNextSignature] = useState<string | null>(null);
+  const [nextSignature, setNextSignature] = useState<Record<string, string | null>>({ [address]: null });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [useMockData, setUseMockData] = useState(false);
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [expandedNodeIds, setExpandedNodeIds] = useState(new Set([address]));
+  const { toast } = useToast();
 
   const fetchBalances = async (addresses: string[], tokenMint?: string) => {
     if (addresses.length === 0) return;
@@ -91,16 +94,15 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             return [...prev, ...newTxs];
         });
 
-        setNextSignature(data.nextCursor);
+        setNextSignature(prev => ({...prev, [fetchAddress]: data.nextCursor}));
 
-        // After fetching transactions, fetch balances for new wallets
         const newAddresses = new Set<string>();
         data.transactions.forEach((tx: FlattenedTransaction) => {
             if (tx.from) newAddresses.add(tx.from);
             if (tx.to) newAddresses.add(tx.to);
         });
         
-        const addressesToFetch = Array.from(newAddresses).filter(addr => !(addr in extraWalletBalances) && addr !== fetchAddress);
+        const addressesToFetch = Array.from(newAddresses).filter(addr => !(addr in extraWalletBalances));
         if (addressesToFetch.length > 0) {
            await fetchBalances(addressesToFetch);
         }
@@ -110,9 +112,23 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } finally {
         setIsFetchingMore(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [extraWalletBalances]);
 
+  const handleExpandNode = (nodeId: string) => {
+    if (expandedNodeIds.has(nodeId)) {
+        toast({
+          title: "Already Expanded",
+          description: "This wallet's transactions are already loaded.",
+        });
+        return;
+    }
+    setExpandedNodeIds(prev => new Set(prev).add(nodeId));
+    fetchTransactions(nodeId);
+    toast({
+      title: "Expanding Node",
+      description: `Fetching transactions for ${shortenAddress(nodeId, 6)}...`,
+    });
+  }
   
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -120,7 +136,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setError(null);
         setAllTransactions([]);
         setExtraWalletBalances({});
-        setNextSignature(null);
+        setNextSignature({ [address]: null });
+        setExpandedNodeIds(new Set([address]));
 
         try {
             const detailsRes = await fetch(`/api/wallet/${address}/details`);
@@ -142,7 +159,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setIsLoading(false);
         setError(null);
         setAllTransactions([]);
-        setNextSignature(null);
+        setNextSignature({ [address]: null });
+        setExpandedNodeIds(new Set([address]));
         const MOCK_SOL_PRICE = 150;
         setWalletDetails({ address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [
             { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', symbol: 'USDC', amount: 500.50, decimals: 6, valueUSD: 500.50, price: 1, tokenStandard: 'Fungible' as any },
@@ -179,8 +197,9 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
 
   const handleLoadMore = () => {
-    if (nextSignature && !isFetchingMore) {
-        fetchTransactions(address, nextSignature);
+    const addressToLoad = Array.from(expandedNodeIds).find(id => nextSignature[id]) || address;
+    if (nextSignature[addressToLoad] && !isFetchingMore) {
+        fetchTransactions(addressToLoad, nextSignature[addressToLoad]!);
     }
   }
 
@@ -205,6 +224,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         </div>
     )
   }
+
+  const hasMoreData = Object.values(nextSignature).some(cursor => cursor !== null);
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
@@ -252,7 +273,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     allTokens={walletDetails?.tokens || []}
                     walletAddress={address}
                     onLoadMore={handleLoadMore}
-                    hasMore={!!nextSignature}
+                    hasMore={hasMoreData}
                     isLoadingMore={isFetchingMore}
                     totalTransactions={liveTransactions.length}
                     dateRange={dateRange}
@@ -318,6 +339,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
                     extraWalletBalances={extraWalletBalances}
+                    onExpandNode={handleExpandNode}
                 />
             </TabsContent>
             <TabsContent value="graph-v2" className="mt-6">

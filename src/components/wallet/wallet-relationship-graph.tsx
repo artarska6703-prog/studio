@@ -33,6 +33,7 @@ interface WalletNetworkGraphProps {
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
+    onExpandNode?: (nodeId: string) => void;
 }
 
 
@@ -85,7 +86,7 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate, onExpandNode }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -96,7 +97,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const debouncedMinVolume = useDebounce(minVolume, 500);
   const [minTransactions, setMinTransactions] = useState(1);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(legendItems.map(i => i.key));
-  const [expandedNodeIds, setExpandedNodeIds] = useState(new Set<string>());
+  const [expandedNodeIds, setExpandedNodeIds] = useState(new Set<string>([walletAddress]));
   const [physicsState, setPhysicsState] = useState<PhysicsState>({ solver: "barnesHut", gravitationalConstant: -8000, centralGravity: 0.1, springLength: 120, springConstant: 0.08, damping: 0.8, avoidOverlap: 0.7 });
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -159,27 +160,40 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
   // Effect for updating data in the datasets
   useEffect(() => {
-    if (!networkRef.current) return;
+      if (!networkRef.current) return;
 
-    // We replace the entire dataset to trigger a re-stabilization
-    nodesDataSetRef.current.clear();
-    edgesDataSetRef.current.clear();
-    nodesDataSetRef.current.add(nodes);
-    edgesDataSetRef.current.add(links);
-    
-    // Tell the network to re-stabilize with the new data
-    networkRef.current.stabilize();
-    
+      const newNodes = new DataSet(nodes);
+      const newEdges = new DataSet(links);
+
+      const oldNodeIds = new Set(nodesDataSetRef.current.getIds());
+      const newNodeIds = new Set(newNodes.getIds());
+
+      const nodesToAdd = (newNodes.get() as GraphNode[]).filter(node => !oldNodeIds.has(node.id!));
+      const nodesToUpdate = (newNodes.get() as GraphNode[]).filter(node => oldNodeIds.has(node.id!));
+      const nodesToRemove = Array.from(oldNodeIds).filter(id => !newNodeIds.has(id));
+      
+      if (nodesToAdd.length > 0) nodesDataSetRef.current.add(nodesToAdd);
+      if (nodesToUpdate.length > 0) nodesDataSetRef.current.update(nodesToUpdate);
+      if (nodesToRemove.length > 0) nodesDataSetRef.current.remove(nodesToRemove);
+
+      const oldEdgeIds = new Set(edgesDataSetRef.current.getIds());
+      const newEdgeIds = new Set(newEdges.getIds());
+      
+      const edgesToAdd = (newEdges.get() as GraphLink[]).filter(edge => !oldEdgeIds.has(edge.id!));
+      const edgesToUpdate = (newEdges.get() as GraphLink[]).filter(edge => oldEdgeIds.has(edge.id!));
+      const edgesToRemove = Array.from(oldEdgeIds).filter(id => !newEdgeIds.has(id));
+
+      if (edgesToAdd.length > 0) edgesDataSetRef.current.add(edgesToAdd);
+      if (edgesToUpdate.length > 0) edgesDataSetRef.current.update(edgesToUpdate);
+      if (edgesToRemove.length > 0) edgesDataSetRef.current.remove(edgesToRemove);
+
   }, [nodes, links]);
 
 
   // Effect for initializing and managing the network instance
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || networkRef.current) return;
     
-    nodesDataSetRef.current = new DataSet(nodes);
-    edgesDataSetRef.current = new DataSet(links);
-
     const options: Options = {
         autoResize: true,
         height: '100%',
@@ -218,7 +232,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     });
 
     networkInstance.on('click', ({ nodes: clickedNodes, event }) => {
-        // This is a workaround to differentiate single and double clicks.
         const handled = (event.detail || 0) > 1; 
         if (clickedNodes.length > 0 && !handled) {
             setSelectedNodeAddress(clickedNodes[0]);
@@ -227,17 +240,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     });
 
     networkInstance.on('doubleClick', ({ nodes: doubleClickedNodes }) => {
-      if (doubleClickedNodes.length > 0) {
+      if (doubleClickedNodes.length > 0 && onExpandNode) {
         const clickedId = doubleClickedNodes[0];
-        setExpandedNodeIds(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(clickedId)) {
-                // Future logic to collapse can go here
-            } else {
-                newSet.add(clickedId);
-            }
-            return newSet;
-        });
+        onExpandNode(clickedId);
       }
     });
 
@@ -259,7 +264,15 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       networkRef.current = null;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [physicsState]);
+  }, [physicsState, onExpandNode]);
+
+  // Effect to apply physics changes
+  useEffect(() => {
+    if (networkRef.current) {
+        networkRef.current.setOptions({ physics: physicsState });
+        networkRef.current.stabilize();
+    }
+  }, [physicsState])
 
   return (
     <Card className="bg-transparent border-0 shadow-none">
