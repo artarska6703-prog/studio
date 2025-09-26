@@ -27,6 +27,7 @@ import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
 import { useToast } from "@/hooks/use-toast";
+import { shortenAddress } from "@/lib/solana-utils";
 
 const TXN_PAGE_SIZE = 100;
 
