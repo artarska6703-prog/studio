@@ -53,7 +53,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
   const [copied, setCopied] = useState(false);
   const [details, setDetails] = useState<WalletDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open && address) {
@@ -89,45 +88,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
     }
   }, [address, open, toast, onOpenChange]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(address)
-      .then(() => {
-        setCopied(true);
-        toast({ title: 'Address copied to clipboard' });
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {
-        // Fallback
-        if (textareaRef.current) {
-          textareaRef.current.value = address;
-          textareaRef.current.style.display = 'block';
-          textareaRef.current.focus();
-          textareaRef.current.select();
-
-          setTimeout(() => {
-            try {
-              const successful = document.execCommand('copy');
-              if (successful) {
-                setCopied(true);
-                toast({ title: 'Address copied to clipboard (fallback)' });
-                setTimeout(() => setCopied(false), 2000);
-              } else {
-                toast({ variant: 'destructive', title: 'Copy failed' });
-              }
-            } catch (err) {
-              console.error('Copy fallback failed:', err);
-              toast({
-                variant: 'destructive',
-                title: 'Copy error',
-                description: String(err),
-              });
-            }
-            textareaRef.current!.style.display = 'none';
-          }, 1);
-        }
-      });
-  };
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md p-0 flex flex-col">
@@ -143,7 +103,31 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                   variant="ghost"
                   size="icon"
                   className="h-5 w-5"
-                  onClick={handleCopy}
+                  onClick={() => {
+                    try {
+                      const textarea = document.createElement('textarea');
+                      textarea.value = address;
+                      textarea.setAttribute('readonly', '');
+                      textarea.style.position = 'absolute';
+                      textarea.style.left = '-9999px';
+                      document.body.appendChild(textarea);
+
+                      textarea.select();
+                      const successful = document.execCommand('copy');
+                      document.body.removeChild(textarea);
+
+                      if (successful) {
+                        setCopied(true);
+                        toast({ title: 'Address copied to clipboard' });
+                        setTimeout(() => setCopied(false), 2000);
+                      } else {
+                        toast({ variant: 'destructive', title: 'Copy failed' });
+                      }
+                    } catch (err) {
+                      console.error('Copy fallback failed:', err);
+                      toast({ variant: 'destructive', title: 'Could not copy address' });
+                    }
+                  }}
                 >
                   {copied ? (
                     <Check className="h-3 w-3 text-green-500" />
@@ -158,19 +142,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
             A summary of this wallet's balance and token holdings.
           </SheetDescription>
         </SheetHeader>
-
-        {/* Hidden textarea for fallback */}
-        <textarea
-          ref={textareaRef}
-          readOnly
-          style={{
-            position: 'absolute',
-            left: '-9999px',
-            top: '0',
-            opacity: 0,
-            pointerEvents: 'none',
-          }}
-        />
 
         {isLoading ? (
           <div className="flex items-center justify-center flex-1">
