@@ -1,4 +1,3 @@
-
 // src/lib/types.ts
 
 export interface TokenHolding {
@@ -55,13 +54,18 @@ export interface FlattenedTransaction {
   feePayer: string;
   instructions: any[];
   type: "received" | "sent" | "program_interaction";
-  amount: number;           // signed (+in/-out)
-  symbol: string | null;    // "SOL" or SPL symbol - can be resolved on frontend
-  mint: string | null;      // SPL mint
+  amount: number;           // signed (+in/-out) for SOL transfers
+  symbol: string | null;    // "SOL" for native, null for others initially
+  mint: string | null;      // SOL mint for native, null for others
   from: string | null;
   to: string | null;
   by: string;
   instruction: string;
   interactedWith: string[];
   valueUSD: number;         // always numeric (>= 0), never null
+  
+  // Fields for SPL token transfers
+  tokenAmount?: number;      // signed (+in/-out) amount of the token
+  tokenSymbol?: string | null;
+  tokenMint?: string | null;
 }

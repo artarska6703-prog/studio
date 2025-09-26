@@ -21,52 +21,80 @@ function toFlattened(
   if (!transactions?.length) return out;
 
   for (const tx of transactions) {
-    let any = false;
     const blockTime = tx.timestamp || tx.blockTime;
+    if (!blockTime) continue;
 
-    const handle = (arr: any[] | undefined, isNative: boolean) => {
-      if (!arr) return;
-      for (const t of arr) {
+    let isInteractionAdded = false;
+
+    // Handle Native SOL Transfers
+    if (tx.nativeTransfers) {
+      for (const t of tx.nativeTransfers) {
         const involved = t.fromUserAccount === walletAddress || t.toUserAccount === walletAddress;
         if (!involved) continue;
 
-        const amount = isNative
-          ? (t.amount || 0) / 1e9
-          : (typeof t.tokenAmount === "number"
-              ? t.tokenAmount
-              : 0);
-
+        const amount = (t.amount || 0) / 1e9;
         if (!amount) continue;
-        any = true;
 
         const outgoing = t.fromUserAccount === walletAddress;
-        const signed = outgoing ? -amount : amount;
-
-        const mint = isNative ? SOL_MINT : t.mint;
-        const price = prices[mint] ?? 0;
-        const symbol = isNative ? "SOL" : (tokenMap.get(mint) || (t.mint?.slice(0, 4) ?? "?"));
+        const signedAmount = outgoing ? -amount : amount;
+        const price = prices[SOL_MINT] ?? 0;
 
         out.push({
           ...tx,
           blockTime,
-          type: signed > 0 ? "received" : "sent",
-          amount: signed,
-          symbol,
-          mint,
-          from: t.fromUserAccount,
-          to: t.toUserAccount,
+          type: signedAmount > 0 ? "received" : "sent",
+          amount: signedAmount,
+          symbol: "SOL",
+          mint: SOL_MINT,
+          from: t.fromUserAccount || null,
+          to: t.toUserAccount || null,
           by: tx.feePayer,
           instruction: tx.type,
-          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean))).filter(a => a !== walletAddress),
-          valueUSD: Math.abs(signed) * price, // numeric, never null
+          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean))).filter(a => a !== walletAddress) as string[],
+          valueUSD: Math.abs(signedAmount) * price,
         });
+        isInteractionAdded = true;
       }
-    };
+    }
 
-    handle(tx.nativeTransfers, true);
-    handle(tx.tokenTransfers, false);
+    // Handle SPL Token Transfers
+    if (tx.tokenTransfers) {
+      for (const t of tx.tokenTransfers) {
+        const involved = t.fromUserAccount === walletAddress || t.toUserAccount === walletAddress;
+        if (!involved) continue;
+        
+        const tokenAmount = typeof t.tokenAmount === "number" ? t.tokenAmount : 0;
+        if (!tokenAmount) continue;
 
-    if (!any && tx.feePayer === walletAddress) {
+        const mint = t.mint || "";
+        const outgoing = t.fromUserAccount === walletAddress;
+        const signedTokenAmount = outgoing ? -tokenAmount : tokenAmount;
+        const price = prices[mint] ?? 0;
+        const symbol = tokenMap.get(mint) || (mint.slice(0, 4) + '...');
+
+        out.push({
+          ...tx,
+          blockTime,
+          type: signedTokenAmount > 0 ? "received" : "sent",
+          amount: 0, // SOL amount is 0 for SPL transfer-focused entry
+          symbol: null,
+          mint: null,
+          from: t.fromUserAccount || null,
+          to: t.toUserAccount || null,
+          by: tx.feePayer,
+          instruction: tx.type,
+          interactedWith: Array.from(new Set([tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean))).filter(a => a !== walletAddress) as string[],
+          valueUSD: Math.abs(signedTokenAmount) * price,
+          tokenAmount: signedTokenAmount,
+          tokenSymbol: symbol,
+          tokenMint: mint,
+        });
+        isInteractionAdded = true;
+      }
+    }
+
+    // Handle general program interactions if no specific transfer involved the wallet
+    if (!isInteractionAdded && tx.feePayer === walletAddress) {
       out.push({
         ...tx,
         blockTime,
@@ -119,7 +147,13 @@ export async function GET(
     const tokenMap = await loadTokenMap();
 
     const mints = new Set<string>([SOL_MINT]);
-    for (const tx of txs) for (const t of tx.tokenTransfers ?? []) if (t.mint) mints.add(t.mint);
+    for (const tx of txs) {
+      if (tx.tokenTransfers) {
+        for (const t of tx.tokenTransfers) {
+          if (t.mint) mints.add(t.mint);
+        }
+      }
+    }
 
     const prices = await getTokenPrices(Array.from(mints));
     console.log("✅ [API TRANSACTIONS] Fetched prices object:", prices);
