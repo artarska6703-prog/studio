@@ -13,28 +13,6 @@ import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
-function copyToClipboard(text: string): boolean {
-  try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-
-    // Position off-screen
-    textarea.style.position = 'absolute';
-    textarea.style.left = '-9999px';
-
-    document.body.appendChild(textarea);
-    textarea.select();
-
-    const success = document.execCommand('copy');
-    document.body.removeChild(textarea);
-
-    return success;
-  } catch (err) {
-    console.error('Fallback copy failed:', err);
-    return false;
-  }
-}
-
 interface WalletDetailSheetProps {
   address: string;
   open: boolean;
@@ -85,18 +63,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
         }
     }, [address, open, toast, onOpenChange]);
 
-    const handleCopy = () => {
-      const success = copyToClipboard(address);
-
-      if (success) {
-        setCopied(true);
-        toast({ title: 'Address copied to clipboard' });
-        setTimeout(() => setCopied(false), 2000);
-      } else {
-        toast({ variant: 'destructive', title: 'Could not copy address' });
-      }
-    };
-
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full sm:max-w-md p-0 flex flex-col">
@@ -108,8 +74,37 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                         <div className="flex flex-col">
                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                 <span>{shortenAddress(address, 12)}</span>
-                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleCopy}>
-                                    {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5"
+                                  onClick={() => {
+                                    try {
+                                      const textarea = document.createElement('textarea');
+                                      textarea.value = address;
+                                      textarea.setAttribute('readonly', '');
+                                      textarea.style.position = 'absolute';
+                                      textarea.style.left = '-9999px';
+                                      document.body.appendChild(textarea);
+                                
+                                      textarea.select();
+                                      const successful = document.execCommand('copy');
+                                      document.body.removeChild(textarea);
+                                
+                                      if (successful) {
+                                        setCopied(true);
+                                        toast({ title: 'Address copied to clipboard' });
+                                        setTimeout(() => setCopied(false), 2000);
+                                      } else {
+                                        toast({ variant: 'destructive', title: 'Copy failed' });
+                                      }
+                                    } catch (err) {
+                                      console.error('Copy fallback failed:', err);
+                                      toast({ variant: 'destructive', title: 'Could not copy address' });
+                                    }
+                                  }}
+                                >
+                                  {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                                 </Button>
                             </div>
                         </div>
