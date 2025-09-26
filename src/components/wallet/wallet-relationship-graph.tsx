@@ -186,17 +186,19 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         autoResize: true,
         height: '100%',
         width: '100%',
+        layout: {
+            // Start with a hierarchical layout for fast initial positioning
+            hierarchical: {
+                enabled: true,
+                levelSeparation: 300,
+                nodeSpacing: 150,
+                treeSpacing: 200,
+                direction: 'UD',
+                sortMethod: 'directed',
+            },
+        },
         physics: {
-          enabled: true,
-          barnesHut: {
-              gravitationalConstant: physics.gravitationalConstant,
-              centralGravity: physics.centralGravity,
-              springLength: physics.springLength,
-              springConstant: physics.springConstant,
-              damping: physics.damping,
-              avoidOverlap: physics.avoidOverlap,
-          },
-          solver: 'barnesHut',
+          enabled: true, // Keep physics enabled initially
         },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
@@ -218,6 +220,27 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       nodes: nodesDataSetRef.current,
       edges: edgesDataSetRef.current
     }, options);
+
+    networkInstance.on('afterDrawing', () => {
+        // Once the hierarchical layout has done its job, switch to physics
+        networkInstance.setOptions({
+            layout: { hierarchical: false },
+            physics: {
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: physics.gravitationalConstant,
+                    centralGravity: physics.centralGravity,
+                    springLength: physics.springLength,
+                    springConstant: physics.springConstant,
+                    damping: physics.damping,
+                    avoidOverlap: physics.avoidOverlap,
+                },
+                solver: 'barnesHut',
+            },
+        });
+        // This listener should only run once
+        networkInstance.off('afterDrawing');
+    });
 
     networkInstance.on('stabilizationIterationsDone', () => {
         networkInstance.setOptions({ physics: false });
@@ -264,7 +287,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]);
+  }, [isLoading, physics]);
 
 
   return (
