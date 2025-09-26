@@ -97,10 +97,19 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const debouncedMinVolume = useDebounce(minVolume, 500);
   const [minTransactions, setMinTransactions] = useState(1);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(legendItems.map(i => i.key));
-  const [expandedNodeIds, setExpandedNodeIds] = useState(new Set<string>([walletAddress]));
+  const [expandedNodeIds, setExpandedNodeIds] = useState(new Set<string>());
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
+  const [physics, setPhysics] = useState<PhysicsState>({
+    solver: "barnesHut",
+    gravitationalConstant: -8000,
+    centralGravity: 0.1,
+    springLength: 120,
+    springConstant: 0.08,
+    damping: 0.09,
+    avoidOverlap: 0.7,
+  });
 
   const allGraphData = useMemo(() => {
     return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, expandedNodeIds);
@@ -141,11 +150,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
   useEffect(() => {
     if (onDiagnosticDataUpdate) {
-        // Since physics is disabled, we pass a default state.
-        const defaultPhysics: PhysicsState = { solver: "hierarchicalRepulsion", gravitationalConstant: 0, centralGravity: 0, springLength: 0, springConstant: 0, damping: 0, avoidOverlap: 0 };
-        onDiagnosticDataUpdate({ nodes, links, physics: defaultPhysics });
+        onDiagnosticDataUpdate({ nodes, links, physics });
     }
-  }, [nodes, links, onDiagnosticDataUpdate]);
+  }, [nodes, links, physics, onDiagnosticDataUpdate]);
 
   const handleNodeTypeToggle = (key: string, checked: boolean) => {
     setVisibleNodeTypes(prev => {
@@ -163,54 +170,33 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   useEffect(() => {
       if (!networkRef.current) return;
 
-      const newNodes = new DataSet(nodes);
-      const newEdges = new DataSet(links);
-
-      const oldNodeIds = new Set(nodesDataSetRef.current.getIds());
-      const newNodeIds = new Set(newNodes.getIds());
-
-      const nodesToAdd = (newNodes.get() as GraphNode[]).filter(node => !oldNodeIds.has(node.id!));
-      const nodesToUpdate = (newNodes.get() as GraphNode[]).filter(node => oldNodeIds.has(node.id!));
-      const nodesToRemove = Array.from(oldNodeIds).filter(id => !newNodeIds.has(id));
+      nodesDataSetRef.current.clear();
+      edgesDataSetRef.current.clear();
+      nodesDataSetRef.current.add(nodes);
+      edgesDataSetRef.current.add(links);
       
-      if (nodesToAdd.length > 0) nodesDataSetRef.current.add(nodesToAdd);
-      if (nodesToUpdate.length > 0) nodesDataSetRef.current.update(nodesToUpdate);
-      if (nodesToRemove.length > 0) nodesDataSetRef.current.remove(nodesToRemove);
-
-      const oldEdgeIds = new Set(edgesDataSetRef.current.getIds());
-      const newEdgeIds = new Set(newEdges.getIds());
-      
-      const edgesToAdd = (newEdges.get() as GraphLink[]).filter(edge => !oldEdgeIds.has(edge.id!));
-      const edgesToUpdate = (newEdges.get() as GraphLink[]).filter(edge => oldEdgeIds.has(edge.id!));
-      const edgesToRemove = Array.from(oldEdgeIds).filter(id => !newEdgeIds.has(id));
-
-      if (edgesToAdd.length > 0) edgesDataSetRef.current.add(edgesToAdd);
-      if (edgesToUpdate.length > 0) edgesDataSetRef.current.update(edgesToUpdate);
-      if (edgesToRemove.length > 0) edgesDataSetRef.current.remove(edgesToRemove);
-
   }, [nodes, links]);
 
 
   // Effect for initializing and managing the network instance
   useEffect(() => {
-    if (isLoading || !containerRef.current || networkRef.current) return;
+    if (isLoading || !containerRef.current) return;
     
     const options: Options = {
         autoResize: true,
         height: '100%',
         width: '100%',
-        layout: {
-            hierarchical: {
-                enabled: true,
-                direction: 'UD',
-                sortMethod: 'directed',
-                nodeSpacing: 150,
-                treeSpacing: 200,
-                levelSeparation: 175,
-            }
-        },
         physics: {
-            enabled: false, // Disable physics for performance and stability
+          enabled: true,
+          barnesHut: {
+              gravitationalConstant: physics.gravitationalConstant,
+              centralGravity: physics.centralGravity,
+              springLength: physics.springLength,
+              springConstant: physics.springConstant,
+              damping: physics.damping,
+              avoidOverlap: physics.avoidOverlap,
+          },
+          solver: 'barnesHut',
         },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
@@ -220,7 +206,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
         },
         edges: {
-            smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 },
+            smooth: { enabled: false },
             color: { color: 'rgba(255,255,255,0.2)', highlight: 'rgba(255,255,255,0.5)' },
             arrows: { to: { enabled: true, scaleFactor: 0.5 } }
         },
@@ -232,10 +218,28 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       nodes: nodesDataSetRef.current,
       edges: edgesDataSetRef.current
     }, options);
+
+    networkInstance.on('stabilizationIterationsDone', () => {
+        networkInstance.setOptions({ physics: false });
+    });
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
-            setSelectedNodeAddress(clickedNodes[0]);
+            const clickedId = clickedNodes[0];
+            setExpandedNodeIds(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(clickedId)) {
+                } else {
+                    newSet.add(clickedId);
+                }
+                return newSet;
+            });
+        }
+    });
+    
+    networkInstance.on('doubleClick', ({ nodes: dblClickedNodes }) => {
+        if (dblClickedNodes.length > 0) {
+            setSelectedNodeAddress(dblClickedNodes[0]);
             setIsSheetOpen(true);
         }
     });
