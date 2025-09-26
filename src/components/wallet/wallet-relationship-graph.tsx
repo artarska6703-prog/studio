@@ -159,32 +159,44 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
   // Effect for updating data in the datasets
   useEffect(() => {
+    if (!networkRef.current) return;
+
     const currentNodes = nodesDataSetRef.current.get({ returnType: "Array" }) as GraphNode[];
     const currentNodeIds = new Set(currentNodes.map(n => n.id));
-    const newNodeIds = new Set(nodes.map(n => n.id));
+    const newNodes = nodes;
+    const newNodeIds = new Set(newNodes.map(n => n.id));
 
-    const nodesToRemove = [...currentNodeIds].filter(id => !newNodeIds.has(id));
-    const nodesToAdd = nodes.filter(node => !currentNodeIds.has(node.id));
+    const nodesToRemove = currentNodes.filter(n => !newNodeIds.has(n.id));
+    const nodesToAdd = newNodes.filter(n => !currentNodeIds.has(n.id));
+    const nodesToUpdate = newNodes.filter(n => currentNodeIds.has(n.id));
 
     if (nodesToRemove.length > 0) {
-      nodesDataSetRef.current.remove(nodesToRemove);
+      nodesDataSetRef.current.remove(nodesToRemove.map(n => n.id));
     }
     if (nodesToAdd.length > 0) {
       nodesDataSetRef.current.add(nodesToAdd);
     }
+    if (nodesToUpdate.length > 0) {
+      nodesDataSetRef.current.update(nodesToUpdate);
+    }
 
     const currentEdges = edgesDataSetRef.current.get({ returnType: "Array" }) as GraphLink[];
     const currentEdgeIds = new Set(currentEdges.map(e => e.id));
-    const newEdgeIds = new Set(links.map(l => l.id));
+    const newEdges = links;
+    const newEdgeIds = new Set(newEdges.map(l => l.id));
 
-    const edgesToRemove = [...currentEdgeIds].filter(id => !newEdgeIds.has(id as string));
-    const edgesToAdd = links.filter(link => !currentEdgeIds.has(link.id));
-    
+    const edgesToRemove = currentEdges.filter(e => !newEdgeIds.has(e.id as string));
+    const edgesToAdd = newEdges.filter(l => !currentEdgeIds.has(l.id));
+    const edgesToUpdate = newEdges.filter(l => currentEdgeIds.has(l.id));
+
     if (edgesToRemove.length > 0) {
-        edgesDataSetRef.current.remove(edgesToRemove as string[]);
+        edgesDataSetRef.current.remove(edgesToRemove.map(e => e.id as string));
     }
     if (edgesToAdd.length > 0) {
         edgesDataSetRef.current.add(edgesToAdd);
+    }
+    if (edgesToUpdate.length > 0) {
+        edgesDataSetRef.current.update(edgesToUpdate);
     }
 
   }, [nodes, links]);
@@ -194,6 +206,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   useEffect(() => {
     if (!containerRef.current) return;
     
+    nodesDataSetRef.current = new DataSet(nodes);
+    edgesDataSetRef.current = new DataSet(links);
+
     const options: Options = {
         autoResize: true,
         height: '100%',
@@ -252,7 +267,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       networkRef.current = null;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [physicsState]); // Re-initialize only if physics change
+  }, [physicsState, allGraphData.nodes.length, allGraphData.links.length]); // Re-init on full data change
 
   return (
     <Card className="bg-transparent border-0 shadow-none">
@@ -262,7 +277,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             <div>
               <h4 className="font-semibold mb-4">Graph Filters</h4>
               <Label>Min Interaction Volume (USD): ${minVolume}</Label>
-              <Slider value={[minVolume]} onValueChange={v => setMinVolume(v[0])} min={0} max={10000} step={100} />
+              <Slider value={[minVolume]} onValueChange={v => setMinVolume(v[0])} min={0} max={100000} step={1000} />
               <Label>Min Transactions: {minTransactions}</Label>
               <Slider value={[minTransactions]} onValueChange={v => setMinTransactions(v[0])} min={1} max={50} step={1} />
             </div>
@@ -294,5 +309,3 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
-
-    
