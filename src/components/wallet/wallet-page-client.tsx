@@ -1,3 +1,4 @@
+
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -6,7 +7,7 @@ import { Header } from "@/components/layout/header";
 import { BalanceCard } from "@/components/wallet/balance-card";
 import { TransactionTable } from "@/components/wallet/transaction-table";
 import { WalletHeader } from "@/components/wallet/wallet-header";
-import type { WalletDetails, FlattenedTransaction } from "@/lib/types";
+import type { WalletDetails, FlattenedTransaction, TokenHolding } from "@/lib/types";
 import Loading from '@/app/wallet/[address]/loading';
 import { TokenTable } from '@/components/wallet/token-table';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const { toast } = useToast();
+  const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
 
   const fetchBalances = async (addresses: string[], tokenMint?: string) => {
     if (addresses.length === 0) return;
@@ -93,6 +95,11 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         });
 
         setNextSignature(data.nextCursor);
+
+        // The transactions endpoint now returns prices
+        if (data.prices) {
+            setTokenPrices(prev => ({...prev, ...data.prices}));
+        }
 
         const newAddresses = new Set<string>();
         data.transactions.forEach((tx: FlattenedTransaction) => {
@@ -150,7 +157,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, useMockData]);
 
-
   const liveTransactions = useMemo(() => {
     if (useMockData) {
         switch (mockScenario) {
@@ -182,6 +188,18 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         fetchTransactions(nextSignature);
     }
   }
+
+  // Enriched token data with prices
+  const enrichedTokens: TokenHolding[] | undefined = useMemo(() => {
+      return walletDetails?.tokens.map(token => {
+          const price = tokenPrices[token.mint] ?? 0;
+          return {
+              ...token,
+              price,
+              valueUSD: token.amount * price,
+          }
+      });
+  }, [walletDetails?.tokens, tokenPrices]);
 
   if (isLoading && !useMockData) {
       return <Loading />;
@@ -234,7 +252,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                               balance={walletDetails.sol.balance}
                               balanceUSD={walletDetails.sol.valueUSD}
                           />
-                          <TokenTable tokens={walletDetails.tokens} className="md:col-span-2" />
+                          <TokenTable tokens={enrichedTokens ?? []} className="md:col-span-2" />
                         </>
                     ) : isLoading ? (
                         <>
@@ -243,12 +261,12 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                         </>
                     ) : <p>No details to display.</p>}
                 </div>
-                {walletDetails ? <PortfolioCompositionChart solValue={walletDetails.sol.valueUSD} tokens={walletDetails.tokens} /> : <p>Loading Chart...</p>}
+                {walletDetails ? <PortfolioCompositionChart solValue={walletDetails.sol.valueUSD} tokens={enrichedTokens ?? []} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
                  <TransactionTable 
                     transactions={filteredTransactions} 
-                    allTokens={walletDetails?.tokens || []}
+                    allTokens={enrichedTokens ?? []}
                     walletAddress={address}
                     onLoadMore={handleLoadMore}
                     hasMore={!!nextSignature}

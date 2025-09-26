@@ -1,3 +1,4 @@
+
 // src/app/api/wallet/[address]/transactions/route.ts
 import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
@@ -144,7 +145,7 @@ export async function GET(
 
     const sigInfo = await connection.getSignaturesForAddress(publicKey, { limit, before });
     if (!sigInfo?.length) {
-      return NextResponse.json({ transactions: [], nextCursor: null });
+      return NextResponse.json({ transactions: [], nextCursor: null, prices: {} });
     }
 
     const sigs = sigInfo.map(s => s.signature);
@@ -163,12 +164,11 @@ export async function GET(
     }
 
     const prices = await getTokenPrices(Array.from(mints));
-    console.log("✅ [API TRANSACTIONS] Fetched prices object:", prices);
 
     const flattened = toFlattened(txs, address, prices, tokenMap);
     const nextCursor = sigInfo[sigInfo.length - 1]?.signature || null;
 
-    return NextResponse.json({ transactions: flattened, nextCursor });
+    return NextResponse.json({ transactions: flattened, nextCursor, prices });
   } catch (err: any) {
     console.error("[transactions] error:", err);
     return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });

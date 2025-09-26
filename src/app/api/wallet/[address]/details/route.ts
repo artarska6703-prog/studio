@@ -29,66 +29,48 @@ export async function GET(
     const connection = new Connection(RPC_ENDPOINT, "confirmed");
     const pubkey = new PublicKey(address);
 
-    // SOL balance
-    let lamports = 0;
-    try {
-      lamports = await connection.getBalance(pubkey);
-    } catch (e: any) {
-      if (!String(e?.message || "").includes("could not find account")) throw e;
-    }
-    const solAmount = lamports / LAMPORTS_PER_SOL;
+    // Get SOL balance and price concurrently
+    const [lamports, prices] = await Promise.all([
+      connection.getBalance(pubkey).catch(e => {
+          if (String(e?.message || "").includes("could not find account")) return 0;
+          throw e;
+      }),
+      getTokenPrices([SOL_MINT])
+    ]);
     
-    // Assets
+    const solAmount = lamports / LAMPORTS_PER_SOL;
+    const solPrice = prices[SOL_MINT] ?? 0;
+    const solValueUSD = solAmount * solPrice;
+
+    // Get Assets (tokens, NFTs, etc.)
     const assets = await helius.rpc.getAssetsByOwner({
       ownerAddress: address,
       page: 1,
       limit: 1000,
     });
 
-    // Collect mints of all fungible tokens, ensuring SOL is always included
-    const tokenMints: string[] = [SOL_MINT];
-    if (assets && assets.items) {
-      assets.items.forEach(asset => {
-        if (
-          asset.interface === 'FungibleToken' &&
-          asset.token_info?.balance &&
-          asset.id !== SOL_MINT // Avoid duplicates
-        ) {
-          tokenMints.push(asset.id);
-        }
-      });
-    }
-    
-    // Fetch prices for all required tokens at once
-    const prices = await getTokenPrices(Array.from(new Set(tokenMints)));
-    console.log("✅ [API DETAILS] Fetched all prices object for", address, prices);
-    
-    const solPrice = prices[SOL_MINT] ?? 0;
-    const solValueUSD = solAmount * solPrice;
-    console.log(`✅ [API DETAILS] Final SOL value for ${address}:`, { solAmount, solPrice, solValueUSD });
-
     // Build tokens list (excluding SOL, which is handled separately)
+    // We will NOT fetch prices here to speed up the initial load.
+    // Prices will be supplied by the transactions endpoint later.
     const tokens: TokenHolding[] = (assets?.items ?? [])
       .filter(a => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
       .map(a => {
         const decimals = a.token_info?.decimals ?? 0;
         const raw = a.token_info?.balance ?? 0;
         const amount = raw / Math.pow(10, decimals);
-        const price = prices[a.id] ?? 0;
+        // Price and valueUSD will be calculated on the client after this fetch.
         return {
           mint: a.id,
           name: a.content?.metadata?.name || "Unknown Token",
           symbol: a.content?.metadata?.symbol || "???",
           amount,
           decimals,
-          price,
-          valueUSD: amount * price,
+          price: 0, // Default to 0, will be updated on client
+          valueUSD: 0, // Default to 0
           icon: a.content?.files?.[0]?.uri,
           tokenStandard: a.token_info?.token_program as any,
         };
       });
-
-    console.log("✅ [API DETAILS] Final token response:", tokens.map(t => ({ symbol: t.symbol, value: t.valueUSD })));
 
     const body: WalletDetails = {
       address,
