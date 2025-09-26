@@ -119,14 +119,12 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     setTimelineValue(timeRange.max);
   }, [timeRange.max]);
 
-  const debouncedTimelineValue = useDebounce(timelineValue, 50);
-
   const timeFilteredTransactions = useMemo(() => {
-    if (timeRange.max === 0 || debouncedTimelineValue === timeRange.max) {
+    if (timeRange.max === 0 || timelineValue === timeRange.max) {
       return transactions;
     }
-    return transactions.filter(tx => tx.blockTime <= debouncedTimelineValue);
-  }, [transactions, debouncedTimelineValue, timeRange.max]);
+    return transactions.filter(tx => tx.blockTime <= timelineValue);
+  }, [transactions, timelineValue, timeRange.max]);
 
   const allGraphData = useMemo(() => {
     return processTransactions(timeFilteredTransactions, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds);
