@@ -103,34 +103,40 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
 
   const allGraphData = useMemo(() => {
-    return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, new Set());
-  }, [transactions, walletAddress, walletDetails, extraWalletBalances]);
+    return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, expandedNodeIds);
+  }, [transactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds]);
 
 
   const { nodes, links } = useMemo(() => {
     const nodesWithFilters = allGraphData.nodes.filter(node => {
-      const isExpanded = expandedNodeIds.has(node.id);
-      const isConnectedToExpanded = allGraphData.links.some(link => 
-        (expandedNodeIds.has(link.from) && link.to === node.id) ||
-        (expandedNodeIds.has(link.to) && link.from === node.id)
-      );
-      
-      const depthOk = allGraphData.nodes.find(n => n.id === node.id)?.level! <= maxDepth;
-      
-      const filterConditions = (
-          (node.balanceUSD ?? 0) >= debouncedMinVolume &&
-          node.transactionCount >= minTransactions &&
-          (visibleNodeTypes.includes(node.type) || node.type === 'root')
-      );
+        const isRoot = node.id === walletAddress;
+        
+        const passesFilters = 
+            (node.balanceUSD ?? 0) >= debouncedMinVolume &&
+            node.transactionCount >= minTransactions &&
+            (visibleNodeTypes.includes(node.type) || isRoot);
 
-      return (depthOk || isExpanded || isConnectedToExpanded) && filterConditions;
+        return passesFilters;
     });
 
-    const nodeIds = new Set(nodesWithFilters.map(n => n.id));
-    const filteredLinks = allGraphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
+    const visibleNodeIds = new Set(nodesWithFilters.map(n => n.id));
 
-    return { nodes: nodesWithFilters, links: filteredLinks };
-  }, [allGraphData, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, expandedNodeIds]);
+    // Filter links to only include those between visible nodes
+    const filteredLinks = allGraphData.links.filter(link => 
+        visibleNodeIds.has(link.from) && visibleNodeIds.has(link.to)
+    );
+    
+    // Determine the final set of nodes to display: all nodes that pass filters AND any nodes that are part of a visible link
+    const nodesInVisibleLinks = new Set<string>();
+    filteredLinks.forEach(link => {
+        nodesInVisibleLinks.add(link.from);
+        nodesInVisibleLinks.add(link.to);
+    });
+
+    const finalNodes = allGraphData.nodes.filter(node => nodesInVisibleLinks.has(node.id));
+
+    return { nodes: finalNodes, links: filteredLinks };
+  }, [allGraphData, debouncedMinVolume, minTransactions, visibleNodeTypes, walletAddress]);
 
 
   useEffect(() => {
@@ -151,6 +157,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     })
   }
 
+  // Effect for updating data in the datasets
   useEffect(() => {
     nodesDataSetRef.current.clear();
     edgesDataSetRef.current.clear();
@@ -159,48 +166,40 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   }, [nodes, links]);
 
 
+  // Effect for initializing and managing the network instance
   useEffect(() => {
     if (!containerRef.current) return;
-    if (networkRef.current) return; // Only initialize once
+    
+    const options: Options = {
+        autoResize: true,
+        height: '100%',
+        width: '100%',
+        physics: { ...physicsState, stabilization: { enabled: true, iterations: 1000, fit: true } },
+        nodes: {
+            font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
+            scaling: { min: 10, max: 80, label: { enabled: true, min: 14, max: 30, drawThreshold: 12, maxVisible: 30 } },
+            borderWidth: 2,
+            shape: 'dot',
+            shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
+        },
+        edges: {
+            smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
+            color: { color: 'rgba(255,255,255,0.2)', highlight: 'rgba(255,255,255,0.5)' },
+            arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+        },
+        groups: groupStyles,
+        interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }
+    };
 
     const networkInstance = new Network(containerRef.current, {
       nodes: nodesDataSetRef.current,
       edges: edgesDataSetRef.current
-    }, {
-      autoResize: true,
-      height: '100%',
-      width: '100%',
-      physics: { ...physicsState, stabilization: { enabled: true, iterations: 1000, fit: true } },
-      nodes: {
-        font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
-        scaling: { min: 10, max: 80, label: { enabled: true, min: 14, max: 30, drawThreshold: 12, maxVisible: 30 } },
-        borderWidth: 2,
-        shape: 'dot',
-        shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
-      },
-      edges: {
-        smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
-        color: { color: 'rgba(255,255,255,0.2)', highlight: 'rgba(255,255,255,0.5)' },
-        arrows: { to: { enabled: true, scaleFactor: 0.5 } }
-      },
-      groups: groupStyles,
-      interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }
-    });
+    }, options);
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
       if (clickedNodes.length > 0) {
-        setExpandedNodeIds(prev => {
-            const newSet = new Set(prev);
-            const clickedId = clickedNodes[0];
-            // Toggle expansion
-            if (newSet.has(clickedId)) {
-                // This logic can be enhanced, e.g., to collapse. For now, we just add.
-                // newSet.delete(clickedId);
-            } else {
-                newSet.add(clickedId);
-            }
-            return newSet;
-        });
+        const clickedId = clickedNodes[0];
+        setExpandedNodeIds(prev => new Set(prev).add(clickedId));
       }
     });
 
@@ -229,7 +228,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       networkRef.current = null;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [physicsState]); // Re-initialize only if physics change
 
   return (
     <Card className="bg-transparent border-0 shadow-none">
@@ -242,8 +241,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
               <Slider value={[minVolume]} onValueChange={v => setMinVolume(v[0])} min={0} max={10000} step={100} />
               <Label>Min Transactions: {minTransactions}</Label>
               <Slider value={[minTransactions]} onValueChange={v => setMinTransactions(v[0])} min={1} max={50} step={1} />
-              <Label>Max Depth: {maxDepth}</Label>
-              <Slider value={[maxDepth]} onValueChange={v => setMaxDepth(v[0])} min={1} max={5} step={1} />
             </div>
             <Separator />
             <div>

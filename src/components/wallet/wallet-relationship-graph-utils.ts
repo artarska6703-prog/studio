@@ -148,19 +148,18 @@ export const processTransactions = (
             allLinks[linkId].width = Math.log2(allLinks[linkId].value + 1) * 2;
         }
     });
-
-    const nodeDepths = new Map<string, number>();
+    
     const visibleNodes = new Set<string>();
 
+    // Initial population based on depth from root
     if (Object.keys(addressData).includes(rootAddress)) {
       const queue: [string, number][] = [[rootAddress, 0]];
       const visited = new Set<string>([rootAddress]);
-      nodeDepths.set(rootAddress, 0);
-      visibleNodes.add(rootAddress);
-
+      
       let head = 0;
       while(head < queue.length) {
           const [currentAddress, depth] = queue[head++];
+          visibleNodes.add(currentAddress);
 
           if (depth >= maxDepth) continue;
 
@@ -168,8 +167,6 @@ export const processTransactions = (
           for (const neighbor of neighbors) {
               if (!visited.has(neighbor)) {
                   visited.add(neighbor);
-                  nodeDepths.set(neighbor, depth + 1);
-                  visibleNodes.add(neighbor);
                   queue.push([neighbor, depth + 1]);
               }
           }
@@ -183,11 +180,6 @@ export const processTransactions = (
         const neighbors = adjacencyList[expandedId];
         for (const neighbor of neighbors) {
             visibleNodes.add(neighbor);
-            // Optionally set depth for coloring/sizing, though not strictly necessary here
-            if (!nodeDepths.has(neighbor)) {
-                const expandedDepth = nodeDepths.get(expandedId);
-                nodeDepths.set(neighbor, expandedDepth !== undefined ? expandedDepth + 1 : maxDepth + 1);
-            }
         }
     });
     
@@ -234,8 +226,9 @@ export const processTransactions = (
             };
         });
 
+    const finalNodeIds = new Set(nodes.map(n => n.id));
     const links = Object.values(allLinks).filter(link => 
-        visibleNodes.has(link.from) && visibleNodes.has(link.to)
+        finalNodeIds.has(link.from) && finalNodeIds.has(link.to)
     );
 
     return { nodes, links };
