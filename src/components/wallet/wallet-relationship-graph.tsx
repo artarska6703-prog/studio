@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -117,6 +116,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
     const debouncedMinVolume = useDebounce(minVolume, 500);
     const [minTransactions, setMinTransactions] = useState(1);
     const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(ALL_NODE_TYPES);
+    const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
 
     const [physicsState, setPhysicsState] = useState<PhysicsState>({
         solver: "barnesHut",
@@ -145,7 +145,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
             return { nodes: [], links: [] };
         }
 
-        const graphData = processTransactions(transactions, walletAddress, maxDepth, walletDetails, extraWalletBalances);
+        const graphData = processTransactions(transactions, walletAddress, maxDepth, walletDetails, extraWalletBalances, expandedNodeIds);
         
         const nodesWithMinTx = graphData.nodes.filter(node => 
             (node.balanceUSD ?? 0) >= debouncedMinVolume &&
@@ -157,7 +157,7 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
         const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
 
         return { nodes: nodesWithMinTx, links: filteredLinks };
-    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, walletDetails, extraWalletBalances]);
+    }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, walletDetails, extraWalletBalances, expandedNodeIds]);
     
     useEffect(() => {
         onDiagnosticDataUpdate?.({ nodes, links, physics: physicsState });
@@ -252,6 +252,17 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
         
         const networkInstance = new Network(containerRef.current, data, options);
 
+        networkInstance.on('doubleClick', (params) => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0] as string;
+                setExpandedNodeIds(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(nodeId);
+                    return newSet;
+                });
+            }
+        });
+
         networkInstance.on('click', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
@@ -320,6 +331,11 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
                                     <Label className="text-sm">Max Depth: {maxDepth}</Label>
                                     <Slider value={[maxDepth]} onValueChange={(v) => setMaxDepth(v[0])} min={1} max={5} step={1} />
                                 </div>
+                                {expandedNodeIds.size > 0 && (
+                                  <Button variant="outline" size="sm" onClick={() => setExpandedNodeIds(new Set())}>
+                                    Reset Expanded Nodes
+                                  </Button>
+                                )}
                             </div>
                         </div>
                         <Separator />

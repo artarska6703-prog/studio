@@ -91,7 +91,8 @@ export const processTransactions = (
     rootAddress: string,
     maxDepth: number,
     walletDetails: WalletDetails | null,
-    extraWalletBalances: Record<string, number>
+    extraWalletBalances: Record<string, number>,
+    expandedNodeIds: Set<string>
 ): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
@@ -149,10 +150,13 @@ export const processTransactions = (
     });
 
     const nodeDepths = new Map<string, number>();
+    const visibleNodes = new Set<string>();
+
     if (Object.keys(addressData).includes(rootAddress)) {
       const queue: [string, number][] = [[rootAddress, 0]];
       const visited = new Set<string>([rootAddress]);
       nodeDepths.set(rootAddress, 0);
+      visibleNodes.add(rootAddress);
 
       let head = 0;
       while(head < queue.length) {
@@ -165,20 +169,36 @@ export const processTransactions = (
               if (!visited.has(neighbor)) {
                   visited.add(neighbor);
                   nodeDepths.set(neighbor, depth + 1);
+                  visibleNodes.add(neighbor);
                   queue.push([neighbor, depth + 1]);
               }
           }
       }
     }
+
+    // Add nodes connected to manually expanded nodes
+    expandedNodeIds.forEach(expandedId => {
+        if (!adjacencyList[expandedId]) return;
+        visibleNodes.add(expandedId); // Ensure the expanded node itself is visible
+        const neighbors = adjacencyList[expandedId];
+        for (const neighbor of neighbors) {
+            visibleNodes.add(neighbor);
+            // Optionally set depth for coloring/sizing, though not strictly necessary here
+            if (!nodeDepths.has(neighbor)) {
+                const expandedDepth = nodeDepths.get(expandedId);
+                nodeDepths.set(neighbor, expandedDepth !== undefined ? expandedDepth + 1 : maxDepth + 1);
+            }
+        }
+    });
     
-    const filteredNodeIds = new Set(Array.from(nodeDepths.keys()));
-    if(filteredNodeIds.size === 0 && Object.keys(addressData).length > 0) {
+    
+    if(visibleNodes.size === 0 && Object.keys(addressData).length > 0) {
         // Fallback if root address not in data, show all.
-        Object.keys(addressData).forEach(id => filteredNodeIds.add(id));
+        Object.keys(addressData).forEach(id => visibleNodes.add(id));
     }
     
     const nodes: GraphNode[] = Object.keys(addressData)
-        .filter(address => filteredNodeIds.has(address))
+        .filter(address => visibleNodes.has(address))
         .map(address => {
             const { txCount } = addressData[address];
             const balance = addressBalances[address] || 0;
@@ -215,7 +235,7 @@ export const processTransactions = (
         });
 
     const links = Object.values(allLinks).filter(link => 
-        filteredNodeIds.has(link.from) && filteredNodeIds.has(link.to)
+        visibleNodes.has(link.from) && visibleNodes.has(link.to)
     );
 
     return { nodes, links };
