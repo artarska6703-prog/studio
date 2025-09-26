@@ -1,4 +1,3 @@
-
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -37,11 +36,17 @@ type WalletPageViewProps = {
   address: string;
 };
 
+type AddressNameAndTags = {
+  name: string;
+  tags: string[];
+};
+
 export function WalletPageView({ address }: WalletPageViewProps) {
   const searchParams = useSearchParams();
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [extraWalletBalances, setExtraWalletBalances] = useState<Record<string, number>>({});
+  const [addressTags, setAddressTags] = useState<Record<string, AddressNameAndTags>>({});
   const [specificTokenBalances, setSpecificTokenBalances] = useState<Record<string, number>>({});
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +85,26 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     }
   };
 
+  const fetchAddressNames = async (addresses: string[]) => {
+    if (addresses.length === 0) return;
+    try {
+      const res = await fetch('/api/wallet/names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses }),
+      });
+      if (!res.ok) {
+        console.error('Failed to fetch address names/tags');
+        return;
+      }
+      const { namesAndTags } = await res.json();
+      setAddressTags((prev) => ({ ...prev, ...namesAndTags }));
+    } catch (e) {
+      console.error('Error fetching address names/tags', e);
+    }
+  };
+
+
   const fetchTransactions = useCallback(async (before?: string) => {
     setIsFetchingMore(true);
     setError(null);
@@ -111,9 +136,14 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             if (tx.to) newAddresses.add(tx.to);
         });
         
-        const addressesToFetch = Array.from(newAddresses).filter(addr => !(addr in extraWalletBalances));
-        if (addressesToFetch.length > 0) {
-           await fetchBalances(addressesToFetch);
+        const addressesToFetchBalances = Array.from(newAddresses).filter(addr => !(addr in extraWalletBalances));
+        if (addressesToFetchBalances.length > 0) {
+           await fetchBalances(addressesToFetchBalances);
+        }
+        
+        const addressesToFetchNames = Array.from(newAddresses).filter(addr => !(addr in addressTags));
+        if (addressesToFetchNames.length > 0) {
+          await fetchAddressNames(addressesToFetchNames);
         }
 
     } catch (e: any) {
@@ -121,7 +151,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } finally {
         setIsFetchingMore(false);
     }
-  }, [address, extraWalletBalances]);
+  }, [address, extraWalletBalances, addressTags]);
   
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -129,6 +159,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setError(null);
         setAllTransactions([]);
         setExtraWalletBalances({});
+        setAddressTags({});
         setNextSignature(null);
 
         try {
@@ -137,7 +168,9 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                 const errorData = await detailsRes.json();
                 throw new Error(errorData.message || 'Failed to fetch wallet details');
             }
-            setWalletDetails(await detailsRes.json());
+            const details = await detailsRes.json();
+            setWalletDetails(details);
+            await fetchAddressNames([address]);
             
             await fetchTransactions();
 
@@ -342,6 +375,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
                     extraWalletBalances={extraWalletBalances}
+                    addressTags={addressTags}
                     isLoading={isLoading}
                 />
             </TabsContent>

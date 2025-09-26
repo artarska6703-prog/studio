@@ -28,11 +28,17 @@ export type DiagnosticData = {
   physics: PhysicsState;
 }
 
+type AddressNameAndTags = {
+  name: string;
+  tags: string[];
+};
+
 interface WalletNetworkGraphProps {
     walletAddress: string;
     transactions: Transaction[];
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
+    addressTags: Record<string, AddressNameAndTags>;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
     isLoading: boolean;
 }
@@ -87,7 +93,7 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate, isLoading }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -101,18 +107,18 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [physics, setPhysics] = useState<PhysicsState>({
-    solver: "barnesHut",
-    gravitationalConstant: -8000,
-    centralGravity: 0.3,
-    springLength: 95,
-    springConstant: 0.04,
+    solver: 'barnesHut',
+    gravitationalConstant: -20000,
+    centralGravity: 0.7,
+    springLength: 80,
+    springConstant: 0.05,
     damping: 0.09,
-    avoidOverlap: 0.7,
+    avoidOverlap: 0.8,
   });
 
   const allGraphData = useMemo(() => {
-    return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, new Set());
-  }, [transactions, walletAddress, walletDetails, extraWalletBalances]);
+    return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, new Set(), {}, addressTags);
+  }, [transactions, walletAddress, walletDetails, extraWalletBalances, addressTags]);
 
 
   const { nodes, links } = useMemo(() => {
@@ -233,7 +239,11 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
-            scaling: { min: 10, max: 80, label: { enabled: true, min: 14, max: 30 } },
+            scaling: { 
+              min: 10, 
+              max: 80, 
+              label: { enabled: true, min: 14, max: 30 }
+            },
             borderWidth: 2,
             shape: 'dot',
             shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
@@ -260,10 +270,10 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     });
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
-        if (clickedNodes.length > 0) {
-            setSelectedNodeAddress(clickedNodes[0]);
-            setIsSheetOpen(true);
-        }
+      if (clickedNodes.length > 0) {
+          setSelectedNodeAddress(clickedNodes[0]);
+          setIsSheetOpen(true);
+      }
     });
 
     networkInstance.on('hoverNode', ({ node, event }) => {

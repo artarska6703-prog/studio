@@ -36,7 +36,31 @@ export interface PhysicsState {
   avoidOverlap: number;
 }
 
-const getNodeType = (address: string, balance: number, balanceUSD: number | null): string => {
+type AddressNameAndTags = {
+    name: string;
+    tags: string[];
+};
+
+const getNodeType = (
+    address: string, 
+    balance: number, 
+    balanceUSD: number | null, 
+    tagsAndName?: AddressNameAndTags
+    ): string => {
+    
+    // 1. Prioritize Helius tags and names
+    if (tagsAndName) {
+        const { name, tags } = tagsAndName;
+        const lowerName = name?.toLowerCase() || '';
+
+        if (tags.includes('protocol') || tags.includes('dex')) return 'platform';
+        if (tags.includes('exchange') || tags.includes('cex')) return 'exchange';
+        if (tags.includes('bridge')) return 'bridge';
+
+        if (lowerName.includes('pump.fun')) return 'platform';
+    }
+    
+    // 2. Fallback to keyword matching on address if no tags
     const lowerAddress = address.toLowerCase();
     const keywords = {
         exchange: ['binance', 'coinbase', 'kraken', 'ftx', 'kucoin'],
@@ -50,13 +74,13 @@ const getNodeType = (address: string, balance: number, balanceUSD: number | null
         }
     }
 
+    // 3. Fallback to balance-based classification
     const usd = balanceUSD || 0;
     if (usd > 100000) return 'whale';
     if (usd > 50000) return 'shark';
     if (usd > 10000) return 'dolphin';
     if (usd > 1000) return 'fish';
     
-    // Fallback to SOL balance if USD value is low or unavailable
     if (balance > 100) return 'fish';
     
     return 'shrimp';
@@ -106,7 +130,8 @@ export const processTransactions = (
     walletDetails: WalletDetails | null,
     extraWalletBalances: Record<string, number>,
     expandedNodeIds: Set<string>,
-    tokenBalances: Record<string, number> = {}
+    tokenBalances: Record<string, number> = {},
+    addressTags: Record<string, AddressNameAndTags> = {}
 ): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
@@ -232,9 +257,9 @@ export const processTransactions = (
             const balance = addressBalances[address] || 0;
             const balanceUSD = solPrice ? balance * solPrice : null; 
             const tokenBalance = tokenBalances[address];
-            let nodeType = getNodeType(address, balance, balanceUSD);
+            let nodeType = getNodeType(address, balance, balanceUSD, addressTags[address]);
             let group = nodeType;
-            let label = shortenAddress(address, 4);
+            let label = addressTags[address]?.name || shortenAddress(address, 4);
             let fixed = false;
 
             if (address === rootAddress) {
