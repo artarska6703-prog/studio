@@ -48,6 +48,47 @@ const StatItem = ({
   </div>
 );
 
+// Fallback copy function for restrictive environments
+async function copyToClipboard(text: string): Promise<boolean> {
+    try {
+        // First, try the modern Clipboard API
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch (err) {
+        // If that fails, fall back to the legacy execCommand
+        console.warn("Clipboard API failed, falling back to execCommand.", err);
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        
+        // Make the textarea invisible
+        textArea.style.position = "fixed"; 
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.width = "2em";
+        textArea.style.height = "2em";
+        textArea.style.padding = "0";
+        textArea.style.border = "none";
+        textArea.style.outline = "none";
+        textArea.style.boxShadow = "none";
+        textArea.style.background = "transparent";
+
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            return successful;
+        } catch (err) {
+            console.error("Fallback copy method failed:", err);
+            document.body.removeChild(textArea);
+            return false;
+        }
+    }
+}
+
+
 export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailSheetProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -88,6 +129,18 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
     }
   }, [address, open, toast, onOpenChange]);
 
+  const handleCopy = () => {
+    copyToClipboard(address).then((success) => {
+      if (success) {
+        setCopied(true);
+        toast({ title: 'Address copied to clipboard' });
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        toast({ variant: 'destructive', title: 'Copy failed' });
+      }
+    });
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md p-0 flex flex-col">
@@ -103,31 +156,7 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
                   variant="ghost"
                   size="icon"
                   className="h-5 w-5"
-                  onClick={() => {
-                    try {
-                      const textarea = document.createElement('textarea');
-                      textarea.value = address;
-                      textarea.setAttribute('readonly', '');
-                      textarea.style.position = 'absolute';
-                      textarea.style.left = '-9999px';
-                      document.body.appendChild(textarea);
-
-                      textarea.select();
-                      const successful = document.execCommand('copy');
-                      document.body.removeChild(textarea);
-
-                      if (successful) {
-                        setCopied(true);
-                        toast({ title: 'Address copied to clipboard' });
-                        setTimeout(() => setCopied(false), 2000);
-                      } else {
-                        toast({ variant: 'destructive', title: 'Copy failed' });
-                      }
-                    } catch (err) {
-                      console.error('Copy fallback failed:', err);
-                      toast({ variant: 'destructive', title: 'Could not copy address' });
-                    }
-                  }}
+                  onClick={handleCopy}
                 >
                   {copied ? (
                     <Check className="h-3 w-3 text-green-500" />
