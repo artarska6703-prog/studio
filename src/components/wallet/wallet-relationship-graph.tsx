@@ -108,10 +108,10 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [physics, setPhysics] = useState<PhysicsState>({
     solver: 'barnesHut',
-    gravitationalConstant: -20000,
-    centralGravity: 0.7,
-    springLength: 80,
-    springConstant: 0.05,
+    gravitationalConstant: -30000,
+    centralGravity: 0.9,
+    springLength: 70,
+    springConstant: 0.06,
     damping: 0.09,
     avoidOverlap: 0.8,
   });
@@ -242,7 +242,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             scaling: { 
               min: 10, 
               max: 80, 
-              label: { enabled: true, min: 14, max: 30 }
+              label: { enabled: false }
             },
             borderWidth: 2,
             shape: 'dot',
@@ -270,10 +270,10 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     });
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
-      if (clickedNodes.length > 0) {
-          setSelectedNodeAddress(clickedNodes[0]);
-          setIsSheetOpen(true);
-      }
+        if (clickedNodes.length > 0) {
+            setSelectedNodeAddress(clickedNodes[0]);
+            setIsSheetOpen(true);
+        }
     });
 
     networkInstance.on('hoverNode', ({ node, event }) => {
