@@ -1,5 +1,3 @@
-
-
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -42,14 +40,13 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [extraWalletBalances, setExtraWalletBalances] = useState<Record<string, number>>({});
   const [specificTokenBalances, setSpecificTokenBalances] = useState<Record<string, number>>({});
-  const [nextSignature, setNextSignature] = useState<Record<string, string | null>>({ [address]: null });
+  const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [useMockData, setUseMockData] = useState(false);
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [expandedNodeIds, setExpandedNodeIds] = useState(new Set([address]));
   const { toast } = useToast();
 
   const fetchBalances = async (addresses: string[], tokenMint?: string) => {
@@ -77,11 +74,11 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     }
   };
 
-  const fetchTransactions = useCallback(async (fetchAddress: string, before?: string) => {
+  const fetchTransactions = useCallback(async (before?: string) => {
     setIsFetchingMore(true);
     setError(null);
     try {
-        const url = `/api/wallet/${fetchAddress}/transactions?limit=${TXN_PAGE_SIZE}${before ? `&before=${before}`: ''}`;
+        const url = `/api/wallet/${address}/transactions?limit=${TXN_PAGE_SIZE}${before ? `&before=${before}`: ''}`;
         const res = await fetch(url);
         if (!res.ok) {
             const errorData = await res.json();
@@ -95,7 +92,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             return [...prev, ...newTxs];
         });
 
-        setNextSignature(prev => ({...prev, [fetchAddress]: data.nextCursor}));
+        setNextSignature(data.nextCursor);
 
         const newAddresses = new Set<string>();
         data.transactions.forEach((tx: FlattenedTransaction) => {
@@ -113,23 +110,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } finally {
         setIsFetchingMore(false);
     }
-  }, [extraWalletBalances]);
-
-  const handleExpandNode = (nodeId: string) => {
-    if (expandedNodeIds.has(nodeId)) {
-        toast({
-          title: "Already Expanded",
-          description: "This wallet's transactions are already loaded.",
-        });
-        return;
-    }
-    setExpandedNodeIds(prev => new Set(prev).add(nodeId));
-    fetchTransactions(nodeId);
-    toast({
-      title: "Expanding Node",
-      description: `Fetching transactions for ${shortenAddress(nodeId, 6)}...`,
-    });
-  }
+  }, [address, extraWalletBalances]);
   
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -137,15 +118,14 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setError(null);
         setAllTransactions([]);
         setExtraWalletBalances({});
-        setNextSignature({ [address]: null });
-        setExpandedNodeIds(new Set([address]));
+        setNextSignature(null);
 
         try {
             const detailsRes = await fetch(`/api/wallet/${address}/details`);
             if (!detailsRes.ok) throw new Error((await detailsRes.json()).message || 'Failed to fetch wallet details');
             setWalletDetails(await detailsRes.json());
             
-            await fetchTransactions(address);
+            await fetchTransactions();
 
         } catch (e: any) {
             setError(e.message);
@@ -160,8 +140,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setIsLoading(false);
         setError(null);
         setAllTransactions([]);
-        setNextSignature({ [address]: null });
-        setExpandedNodeIds(new Set([address]));
+        setNextSignature(null);
         const MOCK_SOL_PRICE = 150;
         setWalletDetails({ address: address, sol: { balance: 1234.56, price: MOCK_SOL_PRICE, valueUSD: 1234.56 * MOCK_SOL_PRICE }, tokens: [
             { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', symbol: 'USDC', amount: 500.50, decimals: 6, valueUSD: 500.50, price: 1, tokenStandard: 'Fungible' as any },
@@ -199,9 +178,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
 
   const handleLoadMore = () => {
-    const addressToLoad = Array.from(expandedNodeIds).find(id => nextSignature[id]) || address;
-    if (nextSignature[addressToLoad] && !isFetchingMore) {
-        fetchTransactions(addressToLoad, nextSignature[addressToLoad]!);
+    if (nextSignature && !isFetchingMore) {
+        fetchTransactions(nextSignature);
     }
   }
 
@@ -226,8 +204,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         </div>
     )
   }
-
-  const hasMoreData = Object.values(nextSignature).some(cursor => cursor !== null);
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
@@ -275,7 +251,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     allTokens={walletDetails?.tokens || []}
                     walletAddress={address}
                     onLoadMore={handleLoadMore}
-                    hasMore={hasMoreData}
+                    hasMore={!!nextSignature}
                     isLoadingMore={isFetchingMore}
                     totalTransactions={liveTransactions.length}
                     dateRange={dateRange}
@@ -341,7 +317,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
                     extraWalletBalances={extraWalletBalances}
-                    onExpandNode={handleExpandNode}
                 />
             </TabsContent>
             <TabsContent value="graph-v2" className="mt-6">

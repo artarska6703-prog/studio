@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -33,7 +32,6 @@ interface WalletNetworkGraphProps {
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
-    onExpandNode?: (nodeId: string) => void;
 }
 
 
@@ -86,7 +84,7 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate, onExpandNode }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -231,19 +229,11 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         networkInstance.setOptions({ physics: false });
     });
 
-    networkInstance.on('click', ({ nodes: clickedNodes, event }) => {
-        const handled = (event.detail || 0) > 1; 
-        if (clickedNodes.length > 0 && !handled) {
+    networkInstance.on('click', ({ nodes: clickedNodes }) => {
+        if (clickedNodes.length > 0) {
             setSelectedNodeAddress(clickedNodes[0]);
             setIsSheetOpen(true);
         }
-    });
-
-    networkInstance.on('doubleClick', ({ nodes: doubleClickedNodes }) => {
-      if (doubleClickedNodes.length > 0 && onExpandNode) {
-        const clickedId = doubleClickedNodes[0];
-        onExpandNode(clickedId);
-      }
     });
 
     networkInstance.on('hoverNode', ({ node, event }) => {
@@ -264,7 +254,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       networkRef.current = null;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [physicsState, onExpandNode]);
+  }, [physicsState]);
 
   // Effect to apply physics changes
   useEffect(() => {
