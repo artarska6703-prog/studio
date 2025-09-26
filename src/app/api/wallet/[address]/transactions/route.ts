@@ -95,6 +95,7 @@ function toFlattened(
 
     // Handle general program interactions if no specific transfer involved the wallet
     if (!isInteractionAdded && tx.feePayer === walletAddress) {
+      const programId = (tx.instructions && tx.instructions.length > 0) ? tx.instructions[0].programId : null;
       out.push({
         ...tx,
         blockTime,
@@ -103,7 +104,7 @@ function toFlattened(
         symbol: null,
         mint: null,
         from: tx.feePayer,
-        to: tx.instructions?.[0]?.programId || null,
+        to: programId,
         by: tx.feePayer,
         instruction: tx.type,
         interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
