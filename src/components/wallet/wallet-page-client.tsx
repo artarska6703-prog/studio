@@ -85,7 +85,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     }
   };
 
-  const fetchAddressNames = async (addresses: string[]) => {
+  const fetchAddressNames = useCallback(async (addresses: string[]) => {
     if (addresses.length === 0) return;
     try {
       const res = await fetch('/api/wallet/names', {
@@ -102,7 +102,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } catch (e) {
       console.error('Error fetching address names/tags', e);
     }
-  };
+  }, []);
 
 
   const fetchTransactions = useCallback(async (before?: string) => {
@@ -151,7 +151,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } finally {
         setIsFetchingMore(false);
     }
-  }, [address, extraWalletBalances, addressTags]);
+  }, [address, extraWalletBalances, addressTags, fetchAddressNames]);
   
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -195,7 +195,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         ] });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, useMockData]);
+  }, [address, useMockData, fetchAddressNames]);
 
   const liveTransactions = useMemo(() => {
     if (useMockData) {
