@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
-import { Transaction, WalletDetails } from '@/lib/types';
+import { Transaction, WalletDetails, FlattenedTransaction } from '@/lib/types';
 import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles, PhysicsState } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
@@ -19,6 +19,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { format } from 'date-fns';
 import { Play, Pause, RotateCcw } from 'lucide-react';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../ui/select';
 
 export type DiagnosticData = {
   nodes: GraphNode[];
@@ -28,7 +29,7 @@ export type DiagnosticData = {
 
 interface WalletNetworkGraphProps {
     walletAddress: string;
-    transactions: Transaction[];
+    transactions: FlattenedTransaction[];
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
 }
@@ -104,6 +105,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [timelineValue, setTimelineValue] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [tokenFilter, setTokenFilter] = useState<string>('all');
   
   const timeRange = useMemo(() => {
     if (transactions.length === 0) return { min: 0, max: 0 };
@@ -126,9 +128,25 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     return transactions.filter(tx => tx.blockTime <= timelineValue);
   }, [transactions, timelineValue, timeRange.max]);
 
+  const availableTokens = useMemo(() => {
+    const tokens = new Map<string, string>();
+    transactions.forEach(tx => {
+      if (tx.tokenMint && tx.tokenSymbol) {
+        if (!tokens.has(tx.tokenMint)) {
+          tokens.set(tx.tokenMint, tx.tokenSymbol);
+        }
+      }
+    });
+    return Array.from(tokens.entries()).map(([mint, symbol]) => ({ mint, symbol }));
+  }, [transactions]);
+
   const allGraphData = useMemo(() => {
-    return processTransactions(timeFilteredTransactions, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds);
-  }, [timeFilteredTransactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds]);
+    const filteredByToken = tokenFilter === 'all' 
+        ? timeFilteredTransactions
+        : timeFilteredTransactions.filter(tx => tx.tokenMint === tokenFilter || (tokenFilter === 'SOL' && tx.mint === 'So11111111111111111111111111111111111111112'));
+
+    return processTransactions(filteredByToken, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds);
+  }, [timeFilteredTransactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds, tokenFilter]);
 
 
   const { nodes, links } = useMemo(() => {
@@ -351,10 +369,33 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
           <div className="space-y-6">
             <div>
               <h4 className="font-semibold mb-4">Graph Filters</h4>
-              <Label>Min Interaction Volume (USD): ${minVolume}</Label>
-              <Slider value={[minVolume]} onValueChange={v => setMinVolume(v[0])} min={0} max={100000} step={1000} />
-              <Label>Min Transactions: {minTransactions}</Label>
-              <Slider value={[minTransactions]} onValueChange={v => setMinTransactions(v[0])} min={1} max={50} step={1} />
+               <div className="space-y-4">
+                  <Select value={tokenFilter} onValueChange={setTokenFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by token..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Tokens</SelectLabel>
+                        <SelectItem value="all">All Tokens</SelectItem>
+                        <SelectItem value="SOL">SOL</SelectItem>
+                        {availableTokens.map(token => (
+                          <SelectItem key={token.mint} value={token.mint}>
+                            {token.symbol}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <div>
+                    <Label>Min Interaction Volume (USD): ${minVolume}</Label>
+                    <Slider value={[minVolume]} onValueChange={v => setMinVolume(v[0])} min={0} max={100000} step={1000} />
+                  </div>
+                  <div>
+                    <Label>Min Transactions: {minTransactions}</Label>
+                    <Slider value={[minTransactions]} onValueChange={v => setMinTransactions(v[0])} min={1} max={50} step={1} />
+                  </div>
+              </div>
             </div>
             <Separator />
              <div>
@@ -407,3 +448,5 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     </Card>
   );
 }
+
+    
