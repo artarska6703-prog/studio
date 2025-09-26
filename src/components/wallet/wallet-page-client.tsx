@@ -113,7 +113,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     } finally {
         setIsFetchingMore(false);
     }
-  }, [extraWalletBalances]);
+  }, []);
 
   const handleExpandNode = (nodeId: string) => {
     if (expandedNodeIds.has(nodeId)) {
