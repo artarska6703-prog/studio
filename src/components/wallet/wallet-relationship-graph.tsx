@@ -102,7 +102,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [physics, setPhysics] = useState<PhysicsState>({
-    solver: "hierarchicalRepulsion",
+    solver: "barnesHut",
     gravitationalConstant: -8000,
     centralGravity: 0.1,
     springLength: 120,
@@ -141,6 +141,8 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         nodesInVisibleLinks.add(link.from);
         nodesInVisibleLinks.add(link.to);
     });
+    
+    nodesInVisibleLinks.add(walletAddress);
 
     const finalNodes = allGraphData.nodes.filter(node => nodesInVisibleLinks.has(node.id));
 
@@ -174,8 +176,12 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       edgesDataSetRef.current.clear();
       nodesDataSetRef.current.add(nodes);
       edgesDataSetRef.current.add(links);
+
+      // Re-enable physics for re-stabilization, then disable again
+      networkRef.current.setOptions({ physics: { enabled: true, ...physics } });
+      networkRef.current.stabilize();
       
-  }, [nodes, links]);
+  }, [nodes, links, physics]);
 
 
   // Effect for initializing and managing the network instance
@@ -186,18 +192,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         autoResize: true,
         height: '100%',
         width: '100%',
-        layout: {
-            hierarchical: {
-                enabled: true,
-                direction: 'UD',
-                sortMethod: 'directed',
-                nodeSpacing: 150,
-                treeSpacing: 200,
-                levelSeparation: 200,
-            }
-        },
         physics: {
-            enabled: false,
+          enabled: true, // Start with physics enabled
+          ...physics
         },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
@@ -207,7 +204,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
         },
         edges: {
-            smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 },
+            smooth: { enabled: true, type: 'dynamic' },
             color: { color: 'rgba(255,255,255,0.2)', highlight: 'rgba(255,255,255,0.5)' },
             arrows: { to: { enabled: true, scaleFactor: 0.5 } }
         },
@@ -219,6 +216,10 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       nodes: nodesDataSetRef.current,
       edges: edgesDataSetRef.current
     }, options);
+
+    networkInstance.on('stabilizationIterationsDone', () => {
+      networkInstance.setOptions({ physics: false });
+    });
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
@@ -261,7 +262,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]);
+  }, [isLoading, physics]);
 
 
   return (
