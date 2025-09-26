@@ -241,11 +241,9 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       const nodesToAdd = (newNodes.get() as GraphNode[]).filter(node => !oldNodeIds.has(node.id!));
       const nodesToRemove = Array.from(oldNodeIds).filter(id => !newNodeIds.has(id));
       
-      // We can also update existing nodes if their properties change, but for now, we just add/remove.
       if (nodesToAdd.length > 0) nodesDataSetRef.current.add(nodesToAdd);
       if (nodesToRemove.length > 0) nodesDataSetRef.current.remove(nodesToRemove);
 
-      // Same logic for edges
       const oldEdgeIds = new Set(edgesDataSetRef.current.getIds());
       const newEdgeIds = new Set(newEdges.getIds());
       
@@ -409,5 +407,3 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     </Card>
   );
 }
-
-    
