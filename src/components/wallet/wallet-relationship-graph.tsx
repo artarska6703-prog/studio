@@ -184,8 +184,8 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     if (linksToAdd.length > 0) edgesDataSetRef.current.add(linksToAdd);
     if (linksToUpdate.length > 0) edgesDataSetRef.current.update(linksToUpdate);
     
-    // Re-run stabilization when data changes
-    networkRef.current.stabilize(1000);
+    // Re-enable physics to allow the new layout to settle.
+    networkRef.current.setOptions({ physics: true });
     
   }, [nodes, links]);
 
@@ -201,15 +201,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         autoResize: true,
         height: '100%',
         width: '100%',
-        physics: {
-          ...physicsState,
-          stabilization: {
-            enabled: true,
-            iterations: 1000,
-            fit: true,
-          },
-          enabled: false // Physics will be disabled after stabilization
-        },
+        physics: physicsState,
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
             scaling: { min: 10, max: 80, label: { enabled: true, min: 14, max: 30, drawThreshold: 12, maxVisible: 30 } },
@@ -313,5 +305,3 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
-
-    
