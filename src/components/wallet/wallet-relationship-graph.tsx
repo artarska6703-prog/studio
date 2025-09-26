@@ -160,32 +160,15 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   // Effect for updating data in the datasets
   useEffect(() => {
     if (!networkRef.current) return;
-  
-    const currentNodes = new Set(nodesDataSetRef.current.getIds());
-    const newNodes = new Set(nodes.map(n => n.id));
 
-    const nodesToRemove = [...currentNodes].filter(id => !newNodes.has(id));
-    const nodesToAdd = nodes.filter(n => !currentNodes.has(n.id));
-    const nodesToUpdate = nodes.filter(n => currentNodes.has(n.id));
-
-    if (nodesToRemove.length > 0) nodesDataSetRef.current.remove(nodesToRemove);
-    if (nodesToAdd.length > 0) nodesDataSetRef.current.add(nodesToAdd);
-    if (nodesToUpdate.length > 0) nodesDataSetRef.current.update(nodesToUpdate);
-
-
-    const currentLinks = new Set(edgesDataSetRef.current.getIds());
-    const newLinks = new Set(links.map(l => l.id as string));
-
-    const linksToRemove = [...currentLinks].filter(id => !newLinks.has(id));
-    const linksToAdd = links.filter(l => !currentLinks.has(l.id as string));
-    const linksToUpdate = links.filter(l => currentLinks.has(l.id as string));
-
-    if (linksToRemove.length > 0) edgesDataSetRef.current.remove(linksToRemove);
-    if (linksToAdd.length > 0) edgesDataSetRef.current.add(linksToAdd);
-    if (linksToUpdate.length > 0) edgesDataSetRef.current.update(linksToUpdate);
+    // We replace the entire dataset to trigger a re-stabilization
+    nodesDataSetRef.current.clear();
+    edgesDataSetRef.current.clear();
+    nodesDataSetRef.current.add(nodes);
+    edgesDataSetRef.current.add(links);
     
-    // Re-enable physics to allow the new layout to settle.
-    networkRef.current.setOptions({ physics: true });
+    // Tell the network to re-stabilize with the new data
+    networkRef.current.stabilize();
     
   }, [nodes, links]);
 
@@ -201,7 +184,14 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         autoResize: true,
         height: '100%',
         width: '100%',
-        physics: physicsState,
+        physics: {
+            ...physicsState,
+            stabilization: {
+                enabled: true,
+                iterations: 200, // Number of iterations to run before layout is considered stable
+                fit: true
+            }
+        },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
             scaling: { min: 10, max: 80, label: { enabled: true, min: 14, max: 30, drawThreshold: 12, maxVisible: 30 } },
@@ -223,8 +213,14 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       edges: edgesDataSetRef.current
     }, options);
     
-    networkInstance.on('click', ({ nodes: clickedNodes }) => {
-        if (clickedNodes.length > 0) {
+    networkInstance.on('stabilizationIterationsDone', () => {
+        networkInstance.setOptions({ physics: false });
+    });
+
+    networkInstance.on('click', ({ nodes: clickedNodes, event }) => {
+        // This is a workaround to differentiate single and double clicks.
+        const handled = (event.detail || 0) > 1; 
+        if (clickedNodes.length > 0 && !handled) {
             setSelectedNodeAddress(clickedNodes[0]);
             setIsSheetOpen(true);
         }
