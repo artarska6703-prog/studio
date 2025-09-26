@@ -88,6 +88,14 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   );
 };
 
+// Function to format large numbers into a compact representation (e.g., 1.5M)
+function formatCompactNumber(num: number): string {
+    if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
+    if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
+    return num.toFixed(1);
+}
+
+
 export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetails, extraWalletBalances }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
@@ -177,8 +185,21 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
 
     const finalNodes = allGraphData.nodes.filter(node => nodesInVisibleLinks.has(node.id));
 
-    return { nodes: finalNodes, links: filteredLinks };
-  }, [allGraphData, debouncedMinVolume, minTransactions, visibleNodeTypes, walletAddress]);
+    const labeledLinks = filteredLinks.map(link => {
+        if (tokenFilter !== 'all') {
+            const tokenVolume = link.tokenVolumes.get(tokenFilter);
+            if (tokenVolume) {
+                return {
+                    ...link,
+                    label: `${formatCompactNumber(tokenVolume.amount)} ${tokenVolume.symbol}`
+                };
+            }
+        }
+        return link;
+    });
+
+    return { nodes: finalNodes, links: labeledLinks };
+  }, [allGraphData, debouncedMinVolume, minTransactions, visibleNodeTypes, walletAddress, tokenFilter]);
 
 
   const handleNodeTypeToggle = (key: string, checked: boolean) => {
@@ -257,18 +278,22 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       const newNodeIds = new Set(newNodes.getIds());
 
       const nodesToAdd = (newNodes.get() as GraphNode[]).filter(node => !oldNodeIds.has(node.id!));
+      const nodesToUpdate = (newNodes.get() as GraphNode[]).filter(node => oldNodeIds.has(node.id!));
       const nodesToRemove = Array.from(oldNodeIds).filter(id => !newNodeIds.has(id));
       
       if (nodesToAdd.length > 0) nodesDataSetRef.current.add(nodesToAdd);
+      if (nodesToUpdate.length > 0) nodesDataSetRef.current.update(nodesToUpdate);
       if (nodesToRemove.length > 0) nodesDataSetRef.current.remove(nodesToRemove);
 
       const oldEdgeIds = new Set(edgesDataSetRef.current.getIds());
       const newEdgeIds = new Set(newEdges.getIds());
       
       const edgesToAdd = (newEdges.get() as GraphLink[]).filter(edge => !oldEdgeIds.has(edge.id!));
+      const edgesToUpdate = (newEdges.get() as GraphLink[]).filter(edge => oldEdgeIds.has(edge.id!));
       const edgesToRemove = Array.from(oldEdgeIds).filter(id => !newEdgeIds.has(id));
 
       if (edgesToAdd.length > 0) edgesDataSetRef.current.add(edgesToAdd);
+      if (edgesToUpdate.length > 0) edgesDataSetRef.current.update(edgesToUpdate);
       if (edgesToRemove.length > 0) edgesDataSetRef.current.remove(edgesToRemove);
       
   }, [nodes, links]);
@@ -311,6 +336,14 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
               max: 15,
             },
             width: 0.5,
+            font: {
+              color: '#a1a1aa',
+              size: 12,
+              face: 'Inter',
+              strokeWidth: 2,
+              strokeColor: '#27272a',
+              align: 'middle'
+            }
         },
         groups: groupStyles,
         interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }

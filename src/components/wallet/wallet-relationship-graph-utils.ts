@@ -22,6 +22,7 @@ export interface GraphLink extends Edge {
     value: number;
     width?: number;
     volume: number;
+    tokenVolumes: Map<string, { amount: number, symbol: string }>;
 }
 
 export interface PhysicsState {
@@ -149,12 +150,22 @@ export const processTransactions = (
             const linkId = [from, to].sort().join('-');
 
             if (!allLinks[linkId]) {
-                allLinks[linkId] = { from: from, to: to, value: 0, volume: 0 };
+                allLinks[linkId] = { from, to, value: 0, volume: 0, tokenVolumes: new Map() };
             }
             allLinks[linkId].value += 1;
             if (value) {
                 allLinks[linkId].volume += Math.abs(value);
             }
+
+            // Aggregate token volumes
+            if ('tokenMint' in tx && tx.tokenMint && tx.tokenSymbol && tx.tokenAmount) {
+                const tokenMint = tx.tokenMint;
+                const current = allLinks[linkId].tokenVolumes.get(tokenMint) || { amount: 0, symbol: tx.tokenSymbol };
+                current.amount += Math.abs(tx.tokenAmount);
+                allLinks[linkId].tokenVolumes.set(tokenMint, current);
+            }
+
+
             // This is now used for edge weight in hierarchical view
             allLinks[linkId].width = Math.log2(allLinks[linkId].volume + 1);
         }
