@@ -255,19 +255,19 @@ export function WalletNetworkGraph({ walletAddress, transactions = [], walletDet
         networkInstance.on('doubleClick', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
-                setExpandedNodeIds(prev => {
-                    const newSet = new Set(prev);
-                    newSet.add(nodeId);
-                    return newSet;
-                });
+                setSelectedNodeAddress(nodeId);
+                setIsSheetOpen(true);
             }
         });
 
         networkInstance.on('click', (params) => {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0] as string;
-                setSelectedNodeAddress(nodeId);
-                setIsSheetOpen(true);
+                setExpandedNodeIds(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(nodeId);
+                    return newSet;
+                });
             }
         });
         
