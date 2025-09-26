@@ -129,7 +129,10 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
         try {
             const detailsRes = await fetch(`/api/wallet/${address}/details`);
-            if (!detailsRes.ok) throw new Error((await detailsRes.json()).message || 'Failed to fetch wallet details');
+            if (!detailsRes.ok) {
+                const errorData = await detailsRes.json();
+                throw new Error(errorData.message || 'Failed to fetch wallet details');
+            }
             setWalletDetails(await detailsRes.json());
             
             await fetchTransactions();
@@ -335,6 +338,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
                     extraWalletBalances={extraWalletBalances}
+                    isLoading={isLoading}
                 />
             </TabsContent>
             <TabsContent value="graph-v2" className="mt-6">

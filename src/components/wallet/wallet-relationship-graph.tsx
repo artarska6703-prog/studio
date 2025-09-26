@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -19,6 +20,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { Settings } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Button } from '../ui/button';
+import { Skeleton } from '../ui/skeleton';
 
 export type DiagnosticData = {
   nodes: GraphNode[];
@@ -32,6 +34,7 @@ interface WalletNetworkGraphProps {
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
+    isLoading: boolean;
 }
 
 
@@ -84,7 +87,7 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate, isLoading }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -190,7 +193,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
   // Effect for initializing and managing the network instance
   useEffect(() => {
-    if (!containerRef.current || networkRef.current) return;
+    if (isLoading || !containerRef.current || networkRef.current) return;
     
     const options: Options = {
         autoResize: true,
@@ -250,11 +253,13 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     networkRef.current = networkInstance;
 
     return () => {
-      networkInstance.destroy();
-      networkRef.current = null;
+      if (networkInstance) {
+          networkInstance.destroy();
+          networkRef.current = null;
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [physicsState]);
+  }, [isLoading]);
 
   // Effect to apply physics changes
   useEffect(() => {
@@ -293,7 +298,13 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
           </div>
         </div>
         <div className="md:col-span-9 h-[800px] relative">
-          <div ref={containerRef} className="w-full h-full" />
+          {isLoading ? (
+            <div className="w-full h-full flex items-center justify-center bg-muted/50 rounded-lg">
+                <Skeleton className="w-full h-full" />
+            </div>
+          ) : (
+            <div ref={containerRef} className="w-full h-full" />
+          )}
           <GraphLegend />
           <CustomTooltip node={tooltipData.node} position={tooltipData.position} />
         </div>
