@@ -172,21 +172,57 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   useEffect(() => {
       if (!networkRef.current) return;
 
-      nodesDataSetRef.current.clear();
-      edgesDataSetRef.current.clear();
-      nodesDataSetRef.current.add(nodes);
-      edgesDataSetRef.current.add(links);
+      const currentNodes = nodesDataSetRef.current.get({ returnType: 'Object' });
+      const nodesToAdd = [];
+      const nodesToUpdate = [];
+      const nodesToRemove = new Set(Object.keys(currentNodes));
+
+      for (const node of nodes) {
+        if (currentNodes[node.id]) { // Node exists, check if update is needed
+            nodesToUpdate.push(node);
+        } else { // New node
+            nodesToAdd.push(node);
+        }
+        nodesToRemove.delete(node.id);
+      }
+      
+      if(nodesToAdd.length > 0) nodesDataSetRef.current.add(nodesToAdd);
+      if(nodesToUpdate.length > 0) nodesDataSetRef.current.update(nodesToUpdate);
+      if(nodesToRemove.size > 0) nodesDataSetRef.current.remove(Array.from(nodesToRemove));
+      
+      const currentEdges = edgesDataSetRef.current.get({ returnType: 'Object' });
+      const edgesToAdd = [];
+      const edgesToUpdate = [];
+      const edgesToRemove = new Set(Object.keys(currentEdges));
+
+      for (const link of links) {
+        const edgeId = `${link.from}-${link.to}`; // Assuming a consistent ID format
+        if (currentEdges[edgeId]) {
+            edgesToUpdate.push({id: edgeId, ...link});
+        } else {
+            edgesToAdd.push({id: edgeId, ...link});
+        }
+        edgesToRemove.delete(edgeId);
+      }
+      
+      if(edgesToAdd.length > 0) edgesDataSetRef.current.add(edgesToAdd);
+      if(edgesToUpdate.length > 0) edgesDataSetRef.current.update(edgesToUpdate);
+      if(edgesToRemove.size > 0) edgesDataSetRef.current.remove(Array.from(edgesToRemove));
 
       // Re-enable physics for re-stabilization, then disable again
-      networkRef.current.setOptions({ physics: { enabled: true, ...physics } });
-      networkRef.current.stabilize();
+      if (nodesToAdd.length > 0 || nodesToRemove.size > 0) {
+        networkRef.current.setOptions({ physics: { enabled: true } });
+        networkRef.current.stabilize(200); // Stabilize for a few iterations
+      }
       
-  }, [nodes, links, physics]);
+  }, [nodes, links]);
 
 
   // Effect for initializing and managing the network instance
   useEffect(() => {
-    if (isLoading || !containerRef.current) return;
+    if (isLoading || nodes.length === 0 || !containerRef.current) {
+        return;
+    }
     
     const options: Options = {
         autoResize: true,
@@ -211,6 +247,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         groups: groupStyles,
         interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }
     };
+    
+    nodesDataSetRef.current = new DataSet(nodes);
+    edgesDataSetRef.current = new DataSet(links);
 
     const networkInstance = new Network(containerRef.current, {
       nodes: nodesDataSetRef.current,
@@ -261,7 +300,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
           networkRef.current = null;
       }
     }
-  }, [isLoading, physics]);
+  }, [isLoading, physics, nodes, links]);
 
 
   return (
@@ -310,3 +349,4 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
+
