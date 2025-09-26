@@ -22,9 +22,11 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   }
 
   let data: any = {};
-  if (symbols.size > 0) {
+  const jupiterMints = uniqueMints.filter(mint => mint !== SOL_MINT);
+  
+  if (jupiterMints.length > 0) {
     try {
-      const url = `${JUP_PRICE_URL}?ids=${Array.from(symbols).join(",")}`;
+      const url = `${JUP_PRICE_URL}?ids=${jupiterMints.join(",")}`;
       const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
@@ -39,22 +41,28 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
 
   const out: Record<string, number> = {};
   for (const mint of uniqueMints) {
+     if (mint === SOL_MINT) continue;
     const sym = mintToSymbol[mint];
     const p = sym && data?.[sym]?.price;
     out[mint] = typeof p === "number" ? p : 0;
   }
 
-  // Hard fallback for SOL
-  if ((uniqueMints.includes(SOL_MINT)) && out[SOL_MINT] === 0) {
+  // Always fetch SOL price from Coingecko as a more reliable source
+  if (uniqueMints.includes(SOL_MINT)) {
     try {
       const res = await fetch(COINGECKO_SOL, { headers: { Accept: "application/json" }, cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         const p = json?.solana?.usd;
-        if (typeof p === "number") out[SOL_MINT] = p;
+        if (typeof p === "number") {
+          out[SOL_MINT] = p;
+        } else {
+          out[SOL_MINT] = 0;
+        }
       }
     } catch (e) {
       console.error("[Price] SOL fallback error:", e);
+      out[SOL_MINT] = out[SOL_MINT] || 0; // ensure it's set
     }
   }
 

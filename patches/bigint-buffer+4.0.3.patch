@@ -1,0 +1,16 @@
+diff --git a/node_modules/bigint-buffer/index.js b/node_modules/bigint-buffer/index.js
+index b83884b..c99f91a 100644
+--- a/node_modules/bigint-buffer/index.js
++++ b/node_modules/bigint-buffer/index.js
+@@ -1,6 +1,4 @@
+ try {
+-    const bindings = require('bindings')('bigint_buffer');
+-    module.exports = bindings;
+-    // console.log('bigint-buffer: Using native bindings');
++    throw new Error('force pure js');
+ } catch (e) {
+-    console.error('bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)');
+     module.exports = require('./index.pure.js');
+-}
+\ No newline at end of file
++}
