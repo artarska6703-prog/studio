@@ -97,7 +97,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [minTransactions, setMinTransactions] = useState(1);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(legendItems.map(i => i.key));
   const [expandedNodeIds, setExpandedNodeIds] = useState(new Set<string>());
-  const [physicsState, setPhysicsState] = useState<PhysicsState>({ solver: "barnesHut", gravitationalConstant: -8000, centralGravity: 0.1, springLength: 120, springConstant: 0.08, damping: 0.09, avoidOverlap: 0.7 });
+  const [physicsState, setPhysicsState] = useState<PhysicsState>({ solver: "barnesHut", gravitationalConstant: -8000, centralGravity: 0.1, springLength: 120, springConstant: 0.08, damping: 0.3, avoidOverlap: 0.7 });
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
@@ -237,15 +237,15 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
       if (clickedNodes.length > 0) {
-        const clickedId = clickedNodes[0];
-        setExpandedNodeIds(prev => new Set(prev).add(clickedId));
+        setSelectedNodeAddress(clickedNodes[0]);
+        setIsSheetOpen(true);
       }
     });
 
     networkInstance.on('doubleClick', ({ nodes: doubleClickedNodes }) => {
-      if (doubleClickedNodes.length > 0) {
-        setSelectedNodeAddress(doubleClickedNodes[0]);
-        setIsSheetOpen(true);
+       if (doubleClickedNodes.length > 0) {
+        const clickedId = doubleClickedNodes[0];
+        setExpandedNodeIds(prev => new Set(prev).add(clickedId));
       }
     });
 
