@@ -177,7 +177,19 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
         edges: {
             smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 },
             color: { color: 'rgba(255,255,255,0.2)', highlight: 'rgba(255,255,255,0.5)' },
-            arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+            arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+            scaling: {
+              min: 1,
+              max: 15,
+              customScalingFunction: (min, max, total, value) => {
+                if (max === min) {
+                  return 0.5;
+                } else {
+                  const scale = 1 / (max - min);
+                  return Math.max(0, (value - min) * scale);
+                }
+              }
+            }
         },
         groups: groupStyles,
         interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }
@@ -190,7 +202,27 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
 
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
-            setSelectedNodeAddress(clickedNodes[0]);
+            const clickedId = clickedNodes[0];
+            if(clickedId !== walletAddress){
+                setExpandedNodeIds(prev => {
+                    const newSet = new Set(prev);
+                    if (newSet.has(clickedId)) {
+                        // Future: Could implement collapse logic here
+                    } else {
+                        newSet.add(clickedId);
+                    }
+                    return newSet;
+                });
+            } else {
+                 setSelectedNodeAddress(clickedId);
+                 setIsSheetOpen(true);
+            }
+        }
+    });
+    
+    networkInstance.on('doubleClick', ({ nodes: dblClickedNodes }) => {
+        if (dblClickedNodes.length > 0) {
+            setSelectedNodeAddress(dblClickedNodes[0]);
             setIsSheetOpen(true);
         }
     });
@@ -212,7 +244,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       networkInstance.destroy();
       networkRef.current = null;
     }
-  }, [nodes, links]);
+  }, [nodes, links, walletAddress]);
 
   return (
     <Card className="bg-transparent border-0 shadow-none">

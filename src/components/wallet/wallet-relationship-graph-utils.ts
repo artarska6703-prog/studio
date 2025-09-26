@@ -145,7 +145,8 @@ export const processTransactions = (
             if (value) {
                 allLinks[linkId].volume += Math.abs(value);
             }
-            allLinks[linkId].width = Math.log2(allLinks[linkId].value + 1) * 2;
+            // This is now used for edge weight in hierarchical view
+            allLinks[linkId].width = Math.log2(allLinks[linkId].volume + 1);
         }
     });
     
@@ -161,7 +162,7 @@ export const processTransactions = (
           const [currentAddress, depth] = queue[head++];
           visibleNodes.add(currentAddress);
 
-          if (depth >= maxDepth) continue;
+          if (depth >= maxDepth && !expandedNodeIds.has(currentAddress)) continue;
 
           const neighbors = adjacencyList[currentAddress] || [];
           for (const neighbor of neighbors) {
