@@ -11,6 +11,7 @@ export interface GraphNode extends Node {
     balance: number;
     balanceUSD: number | null;
     transactionCount: number;
+    netFlow: number;
     type: string;
     notes: string;
 }
@@ -105,29 +106,39 @@ export const processTransactions = (
         addressBalances[walletDetails.address] = walletDetails.sol.balance;
     }
 
-    const addressData: { [key: string]: { txCount: number; interactionVolume: number } } = {};
+    const addressData: { [key: string]: { txCount: number; interactionVolume: number; netFlow: number; } } = {};
     const allLinks: { [key: string]: GraphLink } = {};
     const adjacencyList: { [key: string]: string[] } = {};
 
     transactions.forEach(tx => {
         const from = 'from' in tx ? tx.from : tx.feePayer;
         const to = 'to' in tx ? tx.to : tx.instructions[0]?.programId;
+        const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null) ?? 0;
+
 
         const participants = new Set([from, to].filter(Boolean) as string[]);
         
         participants.forEach(address => {
             if (!addressData[address]) {
-                addressData[address] = { txCount: 0, interactionVolume: 0 };
+                addressData[address] = { txCount: 0, interactionVolume: 0, netFlow: 0 };
             }
              if (!adjacencyList[address]) {
                 adjacencyList[address] = [];
             }
             addressData[address].txCount++;
-            const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null);
-            if (value && value > 0) {
+            
+            if (value > 0) {
                  addressData[address].interactionVolume += value;
             }
         });
+
+        // Calculate Net Flow
+        if (from && value > 0) {
+            addressData[from].netFlow -= value;
+        }
+        if (to && value > 0) {
+            addressData[to].netFlow += value;
+        }
         
         if (from && to && from !== to) {
             if (!adjacencyList[from]) adjacencyList[from] = [];
@@ -136,7 +147,6 @@ export const processTransactions = (
             if (!adjacencyList[to].includes(from)) adjacencyList[to].push(from);
 
             const linkId = [from, to].sort().join('-');
-            const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null);
 
             if (!allLinks[linkId]) {
                 allLinks[linkId] = { from: from, to: to, value: 0, volume: 0 };
@@ -189,11 +199,13 @@ export const processTransactions = (
         // Fallback if root address not in data, show all.
         Object.keys(addressData).forEach(id => visibleNodes.add(id));
     }
+
+    const SMART_MONEY_THRESHOLD_USD = 50000; // e.g., Net inflow of $50k
     
     const nodes: GraphNode[] = Object.keys(addressData)
         .filter(address => visibleNodes.has(address))
         .map(address => {
-            const { txCount } = addressData[address];
+            const { txCount, netFlow } = addressData[address];
             const balance = addressBalances[address] || 0;
             const balanceUSD = solPrice ? balance * solPrice : null; 
             let nodeType = getNodeType(address, balance, balanceUSD);
@@ -208,12 +220,23 @@ export const processTransactions = (
                 fixed = true;
             }
 
+            const isSmartMoney = netFlow > SMART_MONEY_THRESHOLD_USD && group !== 'root';
+            const nodeColor = isSmartMoney ? { 
+                border: 'hsl(var(--accent))',
+                background: groupStyles[group]?.color?.background,
+                highlight: {
+                  border: 'hsl(var(--accent))',
+                  background: groupStyles[group]?.color?.highlight?.background,
+                },
+              } : undefined;
+
             return {
                 id: address,
                 label: label,
                 balance: balance,
                 balanceUSD: balanceUSD,
                 transactionCount: txCount,
+                netFlow: netFlow,
                 type: nodeType,
                 notes: '',
                 shape: 'dot',
@@ -223,7 +246,9 @@ export const processTransactions = (
                 fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
-                title: undefined // Remove title to prevent default tooltip
+                title: undefined, // Remove title to prevent default tooltip
+                color: nodeColor,
+                borderWidth: isSmartMoney ? 4 : 2,
             };
         });
 

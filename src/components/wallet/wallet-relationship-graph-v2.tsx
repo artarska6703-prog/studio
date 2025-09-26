@@ -77,6 +77,10 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
         <div className="text-right font-mono">{node.balanceUSD !== null ? formatCurrency(node.balanceUSD) : 'N/A'}</div>
         <div className="text-muted-foreground">Transactions:</div>
         <div className="text-right font-mono">{node.transactionCount}</div>
+        <div className="text-muted-foreground">Net Flow (USD):</div>
+        <div className={cn("text-right font-mono", node.netFlow > 0 ? "text-green-500" : "text-red-500")}>
+            {formatCurrency(node.netFlow)}
+        </div>
       </div>
     </div>
   );
@@ -98,7 +102,8 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
 
   const allGraphData = useMemo(() => {
-    return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, expandedNodeIds);
+    // We pass a higher maxDepth to processTransactions to ensure we have data for expansion
+    return processTransactions(transactions, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds);
   }, [transactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds]);
 
 
@@ -125,7 +130,11 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
         nodesInVisibleLinks.add(link.from);
         nodesInVisibleLinks.add(link.to);
     });
+    
+    // Ensure the root node is always present
+    nodesInVisibleLinks.add(walletAddress);
 
+    // Final nodes are ones that have visible links attached, plus the root.
     const finalNodes = allGraphData.nodes.filter(node => nodesInVisibleLinks.has(node.id));
 
     return { nodes: finalNodes, links: filteredLinks };
@@ -181,15 +190,8 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
             scaling: {
               min: 1,
               max: 15,
-              customScalingFunction: (min, max, total, value) => {
-                if (max === min) {
-                  return 0.5;
-                } else {
-                  const scale = 1 / (max - min);
-                  return Math.max(0, (value - min) * scale);
-                }
-              }
-            }
+            },
+            width: 0.5, // base width
         },
         groups: groupStyles,
         interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }
@@ -203,20 +205,15 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
             const clickedId = clickedNodes[0];
-            if(clickedId !== walletAddress){
-                setExpandedNodeIds(prev => {
-                    const newSet = new Set(prev);
-                    if (newSet.has(clickedId)) {
-                        // Future: Could implement collapse logic here
-                    } else {
-                        newSet.add(clickedId);
-                    }
-                    return newSet;
-                });
-            } else {
-                 setSelectedNodeAddress(clickedId);
-                 setIsSheetOpen(true);
-            }
+            setExpandedNodeIds(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(clickedId)) {
+                    // Future: Could implement collapse logic here
+                } else {
+                    newSet.add(clickedId);
+                }
+                return newSet;
+            });
         }
     });
     
