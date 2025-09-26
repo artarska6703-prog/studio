@@ -1,3 +1,4 @@
+
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -11,7 +12,7 @@ import Loading from '@/app/wallet/[address]/loading';
 import { TokenTable } from '@/components/wallet/token-table';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, LineChart, X } from 'lucide-react';
+import { Terminal, LineChart, X, Share } from 'lucide-react';
 import { WalletNetworkGraph } from '@/components/wallet/wallet-relationship-graph';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getBalancedTxs, getWhaleTxs, getDegenTxs } from '@/components/wallet/mock-tx-data';
@@ -293,6 +294,12 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                           </Button>
                         }
                       </div>
+                      <Button asChild variant="outline">
+                        <Link href={`/wallet/${address}/graph-v2`} target="_blank">
+                          <Share className="mr-2 h-4 w-4"/>
+                          View Graph V2
+                        </Link>
+                      </Button>
                       <Button asChild variant="outline">
                         <Link href={`/diagnostic?address=${address}&scenario=${useMockData ? mockScenario : 'real'}`}>
                           <LineChart className="mr-2 h-4 w-4"/>
