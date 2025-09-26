@@ -74,7 +74,7 @@ export async function GET(
         const decimals = a.token_info?.decimals ?? 0;
         const raw = a.token_info?.balance ?? 0;
         const amount = raw / Math.pow(10, decimals);
-        const price = prices[a.id] ?? 0;
+        const price = prices[a.id] ?? 0; // **CRITICAL FIX: Default to 0 if price is not found**
         return {
           mint: a.id,
           name: a.content?.metadata?.name || "Unknown Token",
