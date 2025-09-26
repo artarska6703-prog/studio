@@ -262,21 +262,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
-            const clickedId = clickedNodes[0];
-            setExpandedNodeIds(prev => {
-                const newSet = new Set(prev);
-                if (newSet.has(clickedId)) {
-                } else {
-                    newSet.add(clickedId);
-                }
-                return newSet;
-            });
-        }
-    });
-    
-    networkInstance.on('doubleClick', ({ nodes: dblClickedNodes }) => {
-        if (dblClickedNodes.length > 0) {
-            setSelectedNodeAddress(dblClickedNodes[0]);
+            setSelectedNodeAddress(clickedNodes[0]);
             setIsSheetOpen(true);
         }
     });
