@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DataSet, Network, Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,8 +17,8 @@ import { WalletDetailSheet } from './wallet-detail-sheet';
 import { shortenAddress } from '@/lib/solana-utils';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '../ui/button';
-import Link from 'next/link';
 import { format } from 'date-fns';
+import { Play, Pause, RotateCcw } from 'lucide-react';
 
 export type DiagnosticData = {
   nodes: GraphNode[];
@@ -92,6 +92,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
   const edgesDataSetRef = useRef(new DataSet<GraphLink>());
+  const animationFrameRef = useRef<number>();
   
   const [minVolume, setMinVolume] = useState(0);
   const debouncedMinVolume = useDebounce(minVolume, 500);
@@ -102,6 +103,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [timelineValue, setTimelineValue] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   const timeRange = useMemo(() => {
     if (transactions.length === 0) return { min: 0, max: 0 };
@@ -117,7 +119,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     setTimelineValue(timeRange.max);
   }, [timeRange.max]);
 
-  const debouncedTimelineValue = useDebounce(timelineValue, 100);
+  const debouncedTimelineValue = useDebounce(timelineValue, 50);
 
   const timeFilteredTransactions = useMemo(() => {
     if (timeRange.max === 0 || debouncedTimelineValue === timeRange.max) {
@@ -173,6 +175,59 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       }
       return Array.from(newSet);
     })
+  }
+
+  // Animation effect
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      return;
+    }
+
+    let lastTime = performance.now();
+    const animate = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      lastTime = currentTime;
+      
+      setTimelineValue(currentValue => {
+        if (currentValue >= timeRange.max) {
+          setIsPlaying(false);
+          return timeRange.max;
+        }
+        const totalDuration = timeRange.max - timeRange.min;
+        const increment = (totalDuration / 30000) * deltaTime; // Animate over ~30 seconds
+        return Math.min(currentValue + increment, timeRange.max);
+      });
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isPlaying, timeRange.min, timeRange.max]);
+
+  const handleTimelineChange = (value: number[]) => {
+    setIsPlaying(false);
+    setTimelineValue(value[0]);
+  };
+
+  const handlePlayPause = () => {
+    if (timelineValue >= timeRange.max) {
+      setTimelineValue(timeRange.min);
+    }
+    setIsPlaying(prev => !prev);
+  }
+
+  const handleReset = () => {
+    setIsPlaying(false);
+    setTimelineValue(timeRange.max);
   }
 
   useEffect(() => {
@@ -282,12 +337,22 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
               <Label>Date: {timelineValue > 0 ? format(new Date(timelineValue * 1000), 'PPp') : 'N/A'}</Label>
               <Slider 
                 value={[timelineValue]} 
-                onValueChange={v => setTimelineValue(v[0])} 
+                onValueChange={handleTimelineChange} 
                 min={timeRange.min} 
                 max={timeRange.max} 
                 step={3600} // 1 hour steps
                 disabled={timeRange.max === 0}
               />
+              <div className="flex items-center gap-2 mt-2">
+                  <Button onClick={handlePlayPause} size="sm" variant="outline" disabled={timeRange.max === 0}>
+                    {isPlaying ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                    {isPlaying ? 'Pause' : 'Play'}
+                  </Button>
+                  <Button onClick={handleReset} size="sm" variant="outline" disabled={timeRange.max === 0}>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset
+                  </Button>
+              </div>
             </div>
             <Separator />
             <div>
@@ -317,5 +382,3 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     </Card>
   );
 }
-
-    
