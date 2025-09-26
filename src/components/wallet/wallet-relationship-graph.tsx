@@ -90,8 +90,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
   const edgesDataSetRef = useRef(new DataSet<GraphLink>());
-  const stabilizationTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   
   const [maxDepth, setMaxDepth] = useState(3);
   const [minVolume, setMinVolume] = useState(0);
@@ -163,10 +161,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   useEffect(() => {
     if (!networkRef.current) return;
   
-    if (stabilizationTimerRef.current) {
-        clearTimeout(stabilizationTimerRef.current);
-    }
-
     const currentNodes = new Set(nodesDataSetRef.current.getIds());
     const newNodes = new Set(nodes.map(n => n.id));
 
@@ -190,11 +184,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     if (linksToAdd.length > 0) edgesDataSetRef.current.add(linksToAdd);
     if (linksToUpdate.length > 0) edgesDataSetRef.current.update(linksToUpdate);
     
-    networkRef.current.setOptions({ physics: { enabled: true } });
-    stabilizationTimerRef.current = setTimeout(() => {
-      networkRef.current?.stopSimulation();
-    }, 3000);
-  
+    // Re-run stabilization when data changes
+    networkRef.current.stabilize(1000);
+    
   }, [nodes, links]);
 
 
@@ -209,7 +201,15 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         autoResize: true,
         height: '100%',
         width: '100%',
-        physics: { ...physicsState, stabilization: { enabled: true, iterations: 1000, fit: true } },
+        physics: {
+          ...physicsState,
+          stabilization: {
+            enabled: true,
+            iterations: 1000,
+            fit: true,
+          },
+          enabled: false // Physics will be disabled after stabilization
+        },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
             scaling: { min: 10, max: 80, label: { enabled: true, min: 14, max: 30, drawThreshold: 12, maxVisible: 30 } },
@@ -230,17 +230,17 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       nodes: nodesDataSetRef.current,
       edges: edgesDataSetRef.current
     }, options);
-
-    if (stabilizationTimerRef.current) {
-        clearTimeout(stabilizationTimerRef.current);
-    }
-    stabilizationTimerRef.current = setTimeout(() => {
-        networkInstance.stopSimulation();
-    }, 3000);
     
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
-      if (clickedNodes.length > 0) {
-        const clickedId = clickedNodes[0];
+        if (clickedNodes.length > 0) {
+            setSelectedNodeAddress(clickedNodes[0]);
+            setIsSheetOpen(true);
+        }
+    });
+
+    networkInstance.on('doubleClick', ({ nodes: doubleClickedNodes }) => {
+      if (doubleClickedNodes.length > 0) {
+        const clickedId = doubleClickedNodes[0];
         setExpandedNodeIds(prev => {
             const newSet = new Set(prev);
             if (newSet.has(clickedId)) {
@@ -251,13 +251,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             return newSet;
         });
       }
-    });
-
-    networkInstance.on('doubleClick', ({ nodes: doubleClickedNodes }) => {
-        if (doubleClickedNodes.length > 0) {
-            setSelectedNodeAddress(doubleClickedNodes[0]);
-            setIsSheetOpen(true);
-        }
     });
 
     networkInstance.on('hoverNode', ({ node, event }) => {
@@ -274,9 +267,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     networkRef.current = networkInstance;
 
     return () => {
-      if (stabilizationTimerRef.current) {
-        clearTimeout(stabilizationTimerRef.current);
-      }
       networkInstance.destroy();
       networkRef.current = null;
     }
@@ -323,9 +313,5 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
-
-    
-
-    
 
     
