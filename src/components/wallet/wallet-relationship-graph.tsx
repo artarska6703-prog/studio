@@ -87,6 +87,10 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
 
 export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, onDiagnosticDataUpdate }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const networkRef = useRef<Network | null>(null);
+  const nodesDataSetRef = useRef(new DataSet<GraphNode>());
+  const edgesDataSetRef = useRef(new DataSet<GraphLink>());
+  
   const [maxDepth, setMaxDepth] = useState(3);
   const [minVolume, setMinVolume] = useState(0);
   const debouncedMinVolume = useDebounce(minVolume, 500);
@@ -98,17 +102,36 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
 
+  const allGraphData = useMemo(() => {
+    return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, new Set());
+  }, [transactions, walletAddress, walletDetails, extraWalletBalances]);
+
+
   const { nodes, links } = useMemo(() => {
-    const graphData = processTransactions(transactions, walletAddress, maxDepth, walletDetails, extraWalletBalances, expandedNodeIds);
-    const nodesWithFilters = graphData.nodes.filter(node =>
-      (node.balanceUSD ?? 0) >= debouncedMinVolume &&
-      node.transactionCount >= minTransactions &&
-      (visibleNodeTypes.includes(node.type) || node.type === 'root')
-    );
+    const nodesWithFilters = allGraphData.nodes.filter(node => {
+      const isExpanded = expandedNodeIds.has(node.id);
+      const isConnectedToExpanded = allGraphData.links.some(link => 
+        (expandedNodeIds.has(link.from) && link.to === node.id) ||
+        (expandedNodeIds.has(link.to) && link.from === node.id)
+      );
+      
+      const depthOk = allGraphData.nodes.find(n => n.id === node.id)?.level! <= maxDepth;
+      
+      const filterConditions = (
+          (node.balanceUSD ?? 0) >= debouncedMinVolume &&
+          node.transactionCount >= minTransactions &&
+          (visibleNodeTypes.includes(node.type) || node.type === 'root')
+      );
+
+      return (depthOk || isExpanded || isConnectedToExpanded) && filterConditions;
+    });
+
     const nodeIds = new Set(nodesWithFilters.map(n => n.id));
-    const filteredLinks = graphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
+    const filteredLinks = allGraphData.links.filter(link => nodeIds.has(link.from) && nodeIds.has(link.to));
+
     return { nodes: nodesWithFilters, links: filteredLinks };
-  }, [transactions, walletAddress, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, walletDetails, extraWalletBalances, expandedNodeIds]);
+  }, [allGraphData, debouncedMinVolume, minTransactions, maxDepth, visibleNodeTypes, expandedNodeIds]);
+
 
   useEffect(() => {
     if (onDiagnosticDataUpdate) {
@@ -129,11 +152,20 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   }
 
   useEffect(() => {
+    nodesDataSetRef.current.clear();
+    edgesDataSetRef.current.clear();
+    nodesDataSetRef.current.add(nodes);
+    edgesDataSetRef.current.add(links);
+  }, [nodes, links]);
+
+
+  useEffect(() => {
     if (!containerRef.current) return;
+    if (networkRef.current) return; // Only initialize once
 
     const networkInstance = new Network(containerRef.current, {
-      nodes: new DataSet(nodes),
-      edges: new DataSet(links)
+      nodes: nodesDataSetRef.current,
+      edges: edgesDataSetRef.current
     }, {
       autoResize: true,
       height: '100%',
@@ -154,13 +186,20 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       groups: groupStyles,
       interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }
     });
-
+    
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
       if (clickedNodes.length > 0) {
         setExpandedNodeIds(prev => {
-          const newSet = new Set(prev);
-          newSet.add(clickedNodes[0]);
-          return newSet;
+            const newSet = new Set(prev);
+            const clickedId = clickedNodes[0];
+            // Toggle expansion
+            if (newSet.has(clickedId)) {
+                // This logic can be enhanced, e.g., to collapse. For now, we just add.
+                // newSet.delete(clickedId);
+            } else {
+                newSet.add(clickedId);
+            }
+            return newSet;
         });
       }
     });
@@ -173,7 +212,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     });
 
     networkInstance.on('hoverNode', ({ node, event }) => {
-      const foundNode = nodes.find(n => n.id === node);
+      const foundNode = nodesDataSetRef.current.get(node);
       if (foundNode && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         setTooltipData({ node: foundNode, position: { x: event.clientX - rect.left + 15, y: event.clientY - rect.top + 15 } });
@@ -182,9 +221,15 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
     networkInstance.on('blurNode', () => setTooltipData({ node: null, position: null }));
     networkInstance.on('dragStart', () => setTooltipData({ node: null, position: null }));
+    
+    networkRef.current = networkInstance;
 
-    return () => networkInstance.destroy();
-  }, [nodes, links, physicsState]);
+    return () => {
+      networkInstance.destroy();
+      networkRef.current = null;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Card className="bg-transparent border-0 shadow-none">
@@ -228,5 +273,3 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
-
-    
