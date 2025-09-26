@@ -59,7 +59,7 @@ const WalletRelationshipDiagnosticDashboard = () => {
             avoidOverlap: 0.7,
         };
 
-        const { nodes, links } = processTransactions(transactions, walletAddress, 5, null, {});
+        const { nodes, links } = processTransactions(transactions, walletAddress, 5, null, {}, new Set());
         setDiagnosticData({
             nodes,
             links,
