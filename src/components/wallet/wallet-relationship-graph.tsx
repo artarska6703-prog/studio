@@ -90,6 +90,8 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
   const edgesDataSetRef = useRef(new DataSet<GraphLink>());
+  const stabilizationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   
   const [maxDepth, setMaxDepth] = useState(3);
   const [minVolume, setMinVolume] = useState(0);
@@ -160,46 +162,35 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   // Effect for updating data in the datasets
   useEffect(() => {
     if (!networkRef.current) return;
-
-    const currentNodes = nodesDataSetRef.current.get({ returnType: "Array" }) as GraphNode[];
-    const currentNodeIds = new Set(currentNodes.map(n => n.id));
-    const newNodes = nodes;
-    const newNodeIds = new Set(newNodes.map(n => n.id));
-
+  
+    // Clear any existing stabilization timer
+    if (stabilizationTimerRef.current) {
+      clearTimeout(stabilizationTimerRef.current);
+    }
+  
+    const currentNodes = nodesDataSetRef.current.get({ returnType: 'Array' }) as GraphNode[];
+    const newNodeIds = new Set(nodes.map(n => n.id));
     const nodesToRemove = currentNodes.filter(n => !newNodeIds.has(n.id));
-    const nodesToAdd = newNodes.filter(n => !currentNodeIds.has(n.id));
-    const nodesToUpdate = newNodes.filter(n => currentNodeIds.has(n.id));
-
     if (nodesToRemove.length > 0) {
       nodesDataSetRef.current.remove(nodesToRemove.map(n => n.id));
     }
-    if (nodesToAdd.length > 0) {
-      nodesDataSetRef.current.add(nodesToAdd);
+    nodesDataSetRef.current.update(nodes);
+  
+    const currentLinks = edgesDataSetRef.current.get({ returnType: 'Array' }) as GraphLink[];
+    const newLinkIds = new Set(links.map(l => l.id));
+    const linksToRemove = currentLinks.filter(l => !newLinkIds.has(l.id));
+    if (linksToRemove.length > 0) {
+      edgesDataSetRef.current.remove(linksToRemove.map(l => l.id as string));
     }
-    if (nodesToUpdate.length > 0) {
-      nodesDataSetRef.current.update(nodesToUpdate);
-    }
-
-    const currentEdges = edgesDataSetRef.current.get({ returnType: "Array" }) as GraphLink[];
-    const currentEdgeIds = new Set(currentEdges.map(e => e.id));
-    const newEdges = links;
-    const newEdgeIds = new Set(newEdges.map(l => l.id));
-
-    const edgesToRemove = currentEdges.filter(e => !newEdgeIds.has(e.id as string));
-    const edgesToAdd = newEdges.filter(l => !currentEdgeIds.has(l.id));
-    const edgesToUpdate = newEdges.filter(l => currentEdgeIds.has(l.id));
-
-    if (edgesToRemove.length > 0) {
-        edgesDataSetRef.current.remove(edgesToRemove.map(e => e.id as string));
-    }
-    if (edgesToAdd.length > 0) {
-        edgesDataSetRef.current.add(edgesToAdd);
-    }
-    if (edgesToUpdate.length > 0) {
-        edgesDataSetRef.current.update(edgesToUpdate);
-    }
-
-  }, [nodes, links]);
+    edgesDataSetRef.current.update(links);
+  
+    // After updating data, restart physics and set a new stabilization timer
+    networkRef.current.setOptions({ physics: { enabled: true, ...physicsState } });
+    stabilizationTimerRef.current = setTimeout(() => {
+      networkRef.current?.stopSimulation();
+    }, 3000);
+  
+  }, [nodes, links, physicsState]);
 
 
   // Effect for initializing and managing the network instance
@@ -235,20 +226,16 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       edges: edgesDataSetRef.current
     }, options);
 
-    const stabilizationTimeout = setTimeout(() => {
+    if (stabilizationTimerRef.current) {
+        clearTimeout(stabilizationTimerRef.current);
+    }
+    stabilizationTimerRef.current = setTimeout(() => {
         networkInstance.stopSimulation();
     }, 3000);
     
     networkInstance.on('doubleClick', ({ nodes: doubleClickedNodes }) => {
       if (doubleClickedNodes.length > 0) {
-        setSelectedNodeAddress(doubleClickedNodes[0]);
-        setIsSheetOpen(true);
-      }
-    });
-
-    networkInstance.on('click', ({ nodes: clickedNodes }) => {
-       if (clickedNodes.length > 0) {
-        const clickedId = clickedNodes[0];
+        const clickedId = doubleClickedNodes[0];
         setExpandedNodeIds(prev => {
             const newSet = new Set(prev);
             if (newSet.has(clickedId)) {
@@ -259,6 +246,13 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             return newSet;
         });
       }
+    });
+
+    networkInstance.on('click', ({ nodes: clickedNodes }) => {
+        if (clickedNodes.length > 0) {
+            setSelectedNodeAddress(clickedNodes[0]);
+            setIsSheetOpen(true);
+        }
     });
 
     networkInstance.on('hoverNode', ({ node, event }) => {
@@ -275,7 +269,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     networkRef.current = networkInstance;
 
     return () => {
-      clearTimeout(stabilizationTimeout);
+      if (stabilizationTimerRef.current) {
+        clearTimeout(stabilizationTimerRef.current);
+      }
       networkInstance.destroy();
       networkRef.current = null;
     }
@@ -322,5 +318,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
+
+    
 
     

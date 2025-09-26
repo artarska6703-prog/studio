@@ -48,52 +48,12 @@ const StatItem = ({
   </div>
 );
 
-// Fallback copy function for restrictive environments
-async function copyToClipboard(text: string): Promise<boolean> {
-    try {
-        // First, try the modern Clipboard API
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch (err) {
-        // If that fails, fall back to the legacy execCommand
-        console.warn("Clipboard API failed, falling back to execCommand.", err);
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        
-        // Make the textarea invisible
-        textArea.style.position = "fixed"; 
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.width = "2em";
-        textArea.style.height = "2em";
-        textArea.style.padding = "0";
-        textArea.style.border = "none";
-        textArea.style.outline = "none";
-        textArea.style.boxShadow = "none";
-        textArea.style.background = "transparent";
-
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-
-        try {
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-            return successful;
-        } catch (err) {
-            console.error("Fallback copy method failed:", err);
-            document.body.removeChild(textArea);
-            return false;
-        }
-    }
-}
-
-
 export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailSheetProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [details, setDetails] = useState<WalletDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open && address) {
@@ -130,15 +90,42 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
   }, [address, open, toast, onOpenChange]);
 
   const handleCopy = () => {
-    copyToClipboard(address).then((success) => {
-      if (success) {
+    navigator.clipboard.writeText(address)
+      .then(() => {
         setCopied(true);
         toast({ title: 'Address copied to clipboard' });
         setTimeout(() => setCopied(false), 2000);
-      } else {
-        toast({ variant: 'destructive', title: 'Copy failed' });
-      }
-    });
+      })
+      .catch(() => {
+        // Fallback
+        if (textareaRef.current) {
+          textareaRef.current.value = address;
+          textareaRef.current.style.display = 'block';
+          textareaRef.current.focus();
+          textareaRef.current.select();
+
+          setTimeout(() => {
+            try {
+              const successful = document.execCommand('copy');
+              if (successful) {
+                setCopied(true);
+                toast({ title: 'Address copied to clipboard (fallback)' });
+                setTimeout(() => setCopied(false), 2000);
+              } else {
+                toast({ variant: 'destructive', title: 'Copy failed' });
+              }
+            } catch (err) {
+              console.error('Copy fallback failed:', err);
+              toast({
+                variant: 'destructive',
+                title: 'Copy error',
+                description: String(err),
+              });
+            }
+            textareaRef.current!.style.display = 'none';
+          }, 1);
+        }
+      });
   };
 
   return (
@@ -171,6 +158,19 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
             A summary of this wallet's balance and token holdings.
           </SheetDescription>
         </SheetHeader>
+
+        {/* Hidden textarea for fallback */}
+        <textarea
+          ref={textareaRef}
+          readOnly
+          style={{
+            position: 'absolute',
+            left: '-9999px',
+            top: '0',
+            opacity: 0,
+            pointerEvents: 'none',
+          }}
+        />
 
         {isLoading ? (
           <div className="flex items-center justify-center flex-1">
