@@ -24,6 +24,7 @@ import { PortfolioCompositionChart } from '@/components/wallet/portfolio-composi
 import type { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
 
 const TXN_PAGE_SIZE = 100;
 
@@ -212,10 +213,11 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         )}
 
         <Tabs defaultValue="portfolio" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
                 <TabsTrigger value="transactions">Transactions</TabsTrigger>
                 <TabsTrigger value="graph">Graph</TabsTrigger>
+                <TabsTrigger value="graph-v2">Graph V2</TabsTrigger>
             </TabsList>
             <TabsContent value="portfolio" className="mt-6 space-y-8">
                  <div className="grid gap-8 md:grid-cols-3">
@@ -295,12 +297,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                         }
                       </div>
                       <Button asChild variant="outline">
-                        <Link href={`/wallet/${address}/graph-v2`} target="_blank">
-                          <Share className="mr-2 h-4 w-4"/>
-                          View Graph V2
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline">
                         <Link href={`/diagnostic?address=${address}&scenario=${useMockData ? mockScenario : 'real'}`}>
                           <LineChart className="mr-2 h-4 w-4"/>
                           View Diagnostics
@@ -310,6 +306,15 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                 </div>
                 <WalletNetworkGraph 
                     key={useMockData ? `mock-${mockScenario}` : `real-${address}-${walletDetails?.sol.price}`}
+                    walletAddress={address}
+                    transactions={liveTransactions}
+                    walletDetails={walletDetails}
+                    extraWalletBalances={extraWalletBalances}
+                />
+            </TabsContent>
+            <TabsContent value="graph-v2" className="mt-6">
+                <WalletNetworkGraphV2 
+                    key={`real-v2-${address}-${walletDetails?.sol.price}`}
                     walletAddress={address}
                     transactions={liveTransactions}
                     walletDetails={walletDetails}

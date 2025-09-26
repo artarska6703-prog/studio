@@ -232,18 +232,14 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
               {legendItems.filter(i => i.key !== 'root').map(item => (
                 <div key={item.key} className="flex items-center space-x-2 my-1">
                   <Checkbox 
-                    id={`filter-${item.key}`}
+                    id={`filter-${item.key}-v2`}
                     checked={visibleNodeTypes.includes(item.key)} 
                     onCheckedChange={checked => handleNodeTypeToggle(item.key, !!checked)} 
                    />
-                  <Label htmlFor={`filter-${item.key}`} className="text-sm font-normal">{item.label}</Label>
+                  <Label htmlFor={`filter-${item.key}-v2`} className="text-sm font-normal">{item.label}</Label>
                 </div>
               ))}
             </div>
-             <Separator />
-             <Button variant="outline" asChild>
-                <Link href={`/wallet/${walletAddress}?tab=graph`}>Back to Physics Graph</Link>
-             </Button>
           </div>
         </div>
         <div className="md:col-span-9 h-[800px] relative">
