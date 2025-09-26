@@ -103,12 +103,12 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [physics, setPhysics] = useState<PhysicsState>({
     solver: "barnesHut",
-    gravitationalConstant: -8000,
-    centralGravity: 0.1,
-    springLength: 120,
-    springConstant: 0.08,
-    damping: 0.09,
-    avoidOverlap: 0.7,
+    gravitationalConstant: -20000,
+    centralGravity: 0.7,
+    springLength: 95,
+    springConstant: 0.1,
+    damping: 0.15,
+    avoidOverlap: 0.8,
   });
 
   const allGraphData = useMemo(() => {
@@ -294,13 +294,92 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       <CardContent className="grid grid-cols-1 md:grid-cols-12 gap-0 p-0">
         <div className="md:col-span-3 p-6 overflow-y-auto max-h-[800px]">
           <div className="space-y-6">
-            <div>
-              <h4 className="font-semibold mb-4">Graph Filters</h4>
+            <div className="flex justify-between items-center">
+              <h4 className="font-semibold">Graph Filters</h4>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <Settings className="h-5 w-5" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Physics Controls</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    Fine-tune the graph layout simulation.
+                                </p>
+                            </div>
+                            <div className="grid gap-2">
+                                <div className="grid grid-cols-3 items-center gap-4">
+                                    <Label htmlFor="grav-const">Gravity</Label>
+                                    <Slider
+                                        id="grav-const"
+                                        value={[physics.gravitationalConstant]}
+                                        onValueChange={(v) => setPhysics(p => ({...p, gravitationalConstant: v[0]}))}
+                                        min={-50000}
+                                        max={0}
+                                        step={1000}
+                                        className="col-span-2"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-3 items-center gap-4">
+                                    <Label htmlFor="central-grav">Central Pull</Label>
+                                    <Slider
+                                        id="central-grav"
+                                        value={[physics.centralGravity]}
+                                        onValueChange={(v) => setPhysics(p => ({...p, centralGravity: v[0]}))}
+                                        min={0}
+                                        max={1}
+                                        step={0.05}
+                                        className="col-span-2"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-3 items-center gap-4">
+                                    <Label htmlFor="spring-len">Spring Length</Label>
+                                    <Slider
+                                        id="spring-len"
+                                        value={[physics.springLength]}
+                                        onValueChange={(v) => setPhysics(p => ({...p, springLength: v[0]}))}
+                                        min={50}
+                                        max={500}
+                                        step={10}
+                                        className="col-span-2"
+                                    />
+                                </div>
+                                 <div className="grid grid-cols-3 items-center gap-4">
+                                    <Label htmlFor="spring-const">Spring Stiffness</Label>
+                                    <Slider
+                                        id="spring-const"
+                                        value={[physics.springConstant]}
+                                        onValueChange={(v) => setPhysics(p => ({...p, springConstant: v[0]}))}
+                                        min={0.01}
+                                        max={0.5}
+                                        step={0.01}
+                                        className="col-span-2"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-3 items-center gap-4">
+                                    <Label htmlFor="damping">Damping</Label>
+                                    <Slider
+                                        id="damping"
+                                        value={[physics.damping]}
+                                        onValueChange={(v) => setPhysics(p => ({...p, damping: v[0]}))}
+                                        min={0.05}
+                                        max={0.5}
+                                        step={0.01}
+                                        className="col-span-2"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
               <Label>Min Interaction Volume (USD): ${minVolume}</Label>
               <Slider value={[minVolume]} onValueChange={v => setMinVolume(v[0])} min={0} max={100000} step={1000} />
               <Label>Min Transactions: {minTransactions}</Label>
               <Slider value={[minTransactions]} onValueChange={v => setMinTransactions(v[0])} min={1} max={50} step={1} />
-            </div>
             <Separator />
             <div>
               <h4 className="font-semibold mb-4">Filter by Type</h4>
