@@ -18,6 +18,7 @@ import { shortenAddress } from '@/lib/solana-utils';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 export type DiagnosticData = {
   nodes: GraphNode[];
@@ -100,11 +101,34 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
+  const [timelineValue, setTimelineValue] = useState(0);
+  
+  const timeRange = useMemo(() => {
+    if (transactions.length === 0) return { min: 0, max: 0 };
+    const blockTimes = transactions.map(tx => tx.blockTime).filter(t => t);
+    if (blockTimes.length === 0) return { min: 0, max: 0 };
+    const min = Math.min(...blockTimes);
+    const max = Math.max(...blockTimes);
+    return { min, max };
+  }, [transactions]);
+
+  useEffect(() => {
+    // Set initial slider value to the max time
+    setTimelineValue(timeRange.max);
+  }, [timeRange.max]);
+
+  const debouncedTimelineValue = useDebounce(timelineValue, 100);
+
+  const timeFilteredTransactions = useMemo(() => {
+    if (timeRange.max === 0 || debouncedTimelineValue === timeRange.max) {
+      return transactions;
+    }
+    return transactions.filter(tx => tx.blockTime <= debouncedTimelineValue);
+  }, [transactions, debouncedTimelineValue, timeRange.max]);
 
   const allGraphData = useMemo(() => {
-    // We pass a higher maxDepth to processTransactions to ensure we have data for expansion
-    return processTransactions(transactions, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds);
-  }, [transactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds]);
+    return processTransactions(timeFilteredTransactions, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds);
+  }, [timeFilteredTransactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds]);
 
 
   const { nodes, links } = useMemo(() => {
@@ -131,10 +155,8 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
         nodesInVisibleLinks.add(link.to);
     });
     
-    // Ensure the root node is always present
     nodesInVisibleLinks.add(walletAddress);
 
-    // Final nodes are ones that have visible links attached, plus the root.
     const finalNodes = allGraphData.nodes.filter(node => nodesInVisibleLinks.has(node.id));
 
     return { nodes: finalNodes, links: filteredLinks };
@@ -166,8 +188,8 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
         layout: {
             hierarchical: {
                 enabled: true,
-                direction: 'UD', // Up-Down direction
-                sortMethod: 'directed', // 'hubsize' or 'directed'
+                direction: 'UD',
+                sortMethod: 'directed',
                 nodeSpacing: 150,
                 treeSpacing: 200,
                 levelSeparation: 200,
@@ -191,7 +213,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
               min: 1,
               max: 15,
             },
-            width: 0.5, // base width
+            width: 0.5,
         },
         groups: groupStyles,
         interaction: { hover: true, tooltipDelay: 0, dragNodes: true, dragView: true, zoomView: true }
@@ -208,7 +230,6 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
             setExpandedNodeIds(prev => {
                 const newSet = new Set(prev);
                 if (newSet.has(clickedId)) {
-                    // Future: Could implement collapse logic here
                 } else {
                     newSet.add(clickedId);
                 }
@@ -256,6 +277,19 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
               <Slider value={[minTransactions]} onValueChange={v => setMinTransactions(v[0])} min={1} max={50} step={1} />
             </div>
             <Separator />
+             <div>
+              <h4 className="font-semibold mb-4">Time Travel</h4>
+              <Label>Date: {timelineValue > 0 ? format(new Date(timelineValue * 1000), 'PPp') : 'N/A'}</Label>
+              <Slider 
+                value={[timelineValue]} 
+                onValueChange={v => setTimelineValue(v[0])} 
+                min={timeRange.min} 
+                max={timeRange.max} 
+                step={3600} // 1 hour steps
+                disabled={timeRange.max === 0}
+              />
+            </div>
+            <Separator />
             <div>
               <h4 className="font-semibold mb-4">Filter by Type</h4>
               {legendItems.filter(i => i.key !== 'root').map(item => (
@@ -283,3 +317,5 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     </Card>
   );
 }
+
+    
