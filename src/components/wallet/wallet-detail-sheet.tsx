@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -93,7 +94,6 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
     navigator.clipboard.writeText(address)
       .then(() => {
         setCopied(true);
-        toast({ title: 'Address copied to clipboard' });
         setTimeout(() => setCopied(false), 2000);
       })
       .catch(() => {
@@ -109,18 +109,10 @@ export function WalletDetailSheet({ address, open, onOpenChange }: WalletDetailS
               const successful = document.execCommand('copy');
               if (successful) {
                 setCopied(true);
-                toast({ title: 'Address copied to clipboard (fallback)' });
                 setTimeout(() => setCopied(false), 2000);
-              } else {
-                toast({ variant: 'destructive', title: 'Copy failed' });
               }
             } catch (err) {
               console.error('Copy fallback failed:', err);
-              toast({
-                variant: 'destructive',
-                title: 'Copy error',
-                description: String(err),
-              });
             }
             textareaRef.current!.style.display = 'none';
           }, 1);
