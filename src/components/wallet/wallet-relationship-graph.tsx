@@ -102,12 +102,12 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [physics, setPhysics] = useState<PhysicsState>({
     solver: "barnesHut",
-    gravitationalConstant: -40000,
-    centralGravity: 0.9,
-    springLength: 80,
-    springConstant: 0.15,
-    damping: 0.15,
-    avoidOverlap: 0.8,
+    gravitationalConstant: -8000,
+    centralGravity: 0.3,
+    springLength: 95,
+    springConstant: 0.04,
+    damping: 0.09,
+    avoidOverlap: 0.7,
   });
 
   const allGraphData = useMemo(() => {
@@ -233,18 +233,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
-            scaling: { 
-                min: 10,
-                max: 80,
-                label: { enabled: false }, // Disable relative label scaling
-                customScalingFunction: (min, max, total, value) => {
-                    if (value === undefined) return 0;
-                    // Logarithmic scaling for node size based on its own value
-                    // The 'value' property of the node is set in getNodeSize in the utils file
-                    const scale = 5 + Math.log1p(value || 1); 
-                    return scale;
-                }
-            },
+            scaling: { min: 10, max: 80, label: { enabled: true, min: 14, max: 30 } },
             borderWidth: 2,
             shape: 'dot',
             shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
