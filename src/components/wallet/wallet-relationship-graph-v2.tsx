@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -32,6 +33,8 @@ interface WalletNetworkGraphProps {
     transactions: FlattenedTransaction[];
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
+    specificTokenBalances: Record<string, number>;
+    onFetchTokenBalances: (addresses: string[], mint: string) => void;
 }
 
 
@@ -96,7 +99,7 @@ function formatCompactNumber(num: number): string {
 }
 
 
-export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetails, extraWalletBalances }: WalletNetworkGraphProps) {
+export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetails, extraWalletBalances, specificTokenBalances, onFetchTokenBalances }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -153,9 +156,16 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
         ? timeFilteredTransactions
         : timeFilteredTransactions.filter(tx => tx.tokenMint === tokenFilter || (tokenFilter === 'SOL' && tx.mint === 'So11111111111111111111111111111111111111112'));
 
-    return processTransactions(filteredByToken, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds);
-  }, [timeFilteredTransactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds, tokenFilter]);
+    return processTransactions(filteredByToken, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds, specificTokenBalances);
+  }, [timeFilteredTransactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds, tokenFilter, specificTokenBalances]);
 
+    useEffect(() => {
+        if (tokenFilter !== 'all' && tokenFilter !== 'SOL') {
+            const addressesInGraph = new Set<string>();
+            allGraphData.nodes.forEach(node => addressesInGraph.add(node.id));
+            onFetchTokenBalances(Array.from(addressesInGraph), tokenFilter);
+        }
+    }, [tokenFilter, allGraphData.nodes, onFetchTokenBalances]);
 
   const { nodes, links } = useMemo(() => {
     const nodesWithFilters = allGraphData.nodes.filter(node => {

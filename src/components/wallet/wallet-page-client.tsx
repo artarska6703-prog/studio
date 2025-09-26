@@ -1,4 +1,5 @@
 
+
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -38,6 +39,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [extraWalletBalances, setExtraWalletBalances] = useState<Record<string, number>>({});
+  const [specificTokenBalances, setSpecificTokenBalances] = useState<Record<string, number>>({});
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,22 +48,28 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
-  const fetchBalances = async (addresses: string[]) => {
+  const fetchBalances = async (addresses: string[], tokenMint?: string) => {
     if (addresses.length === 0) return;
     try {
-        const res = await fetch('/api/wallet/balances', {
+        const endpoint = tokenMint ? `/api/wallet/token-balances` : '/api/wallet/balances';
+        const body = tokenMint ? { addresses, mint: tokenMint } : { addresses };
+        const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ addresses }),
+            body: JSON.stringify(body),
         });
         if (!res.ok) {
-            console.error('Failed to fetch extra balances');
+            console.error(`Failed to fetch balances (token: ${!!tokenMint})`);
             return;
         }
         const { balances } = await res.json();
-        setExtraWalletBalances(prev => ({ ...prev, ...balances }));
+        if (tokenMint) {
+            setSpecificTokenBalances(prev => ({...prev, ...balances}));
+        } else {
+            setExtraWalletBalances(prev => ({ ...prev, ...balances }));
+        }
     } catch (e) {
-        console.error('Error fetching extra balances', e);
+        console.error('Error fetching balances', e);
     }
   };
 
@@ -319,6 +327,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
                     extraWalletBalances={extraWalletBalances}
+                    specificTokenBalances={specificTokenBalances}
+                    onFetchTokenBalances={fetchBalances}
                 />
             </TabsContent>
         </Tabs>

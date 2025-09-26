@@ -14,6 +14,7 @@ export interface GraphNode extends Node {
     netFlow: number;
     type: string;
     notes: string;
+    tokenBalance?: number;
 }
 
 export interface GraphLink extends Edge {
@@ -61,9 +62,14 @@ const getNodeType = (address: string, balance: number, balanceUSD: number | null
     return 'shrimp';
 };
 
-const getMass = (balance: number, balanceUSD: number | null) => {
-    // Prioritize USD for mass calculation, but fall back to SOL balance if USD is not available.
-    const value = balanceUSD !== null && balanceUSD > 0 ? balanceUSD : (balance * 150); // Use a default price for scaling if no live price
+const getMass = (balance: number, balanceUSD: number | null, tokenBalance?: number) => {
+    let value = 0;
+    if (tokenBalance && tokenBalance > 0) {
+        value = tokenBalance; 
+    } else {
+        value = balanceUSD !== null && balanceUSD > 0 ? balanceUSD : (balance * 150);
+    }
+    
     const baseMass = Math.log1p(value) || 1;
     const type = getNodeType('', balance, balanceUSD);
 
@@ -74,10 +80,15 @@ const getMass = (balance: number, balanceUSD: number | null) => {
     return baseMass;
 }
 
-const getNodeSize = (balance: number, balanceUSD: number | null) => {
-    // Prioritize USD for size calculation, but fall back to SOL balance if USD is not available.
-    const value = (balanceUSD !== null && balanceUSD > 0) ? balanceUSD : (balance * 150); // Use a default price for scaling
-    // Add a fallback for value to prevent Math.log1p(0) which is 0.
+const getNodeSize = (balance: number, balanceUSD: number | null, tokenBalance?: number) => {
+    let value = 0;
+    if (tokenBalance && tokenBalance > 0) {
+        // We don't have price, so just use amount for relative sizing
+        value = tokenBalance;
+    } else {
+        value = (balanceUSD !== null && balanceUSD > 0) ? balanceUSD : (balance * 150);
+    }
+
     const baseSize = 5 + Math.log1p(value || 1);
     const type = getNodeType('', balance, balanceUSD);
     
@@ -94,7 +105,8 @@ export const processTransactions = (
     maxDepth: number,
     walletDetails: WalletDetails | null,
     extraWalletBalances: Record<string, number>,
-    expandedNodeIds: Set<string>
+    expandedNodeIds: Set<string>,
+    tokenBalances: Record<string, number> = {}
 ): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
@@ -219,6 +231,7 @@ export const processTransactions = (
             const { txCount, netFlow } = addressData[address];
             const balance = addressBalances[address] || 0;
             const balanceUSD = solPrice ? balance * solPrice : null; 
+            const tokenBalance = tokenBalances[address];
             let nodeType = getNodeType(address, balance, balanceUSD);
             let group = nodeType;
             let label = shortenAddress(address, 4);
@@ -251,8 +264,8 @@ export const processTransactions = (
                 type: nodeType,
                 notes: '',
                 shape: 'dot',
-                value: getNodeSize(balance, balanceUSD),
-                mass: getMass(balance, balanceUSD),
+                value: getNodeSize(balance, balanceUSD, tokenBalance),
+                mass: getMass(balance, balanceUSD, tokenBalance),
                 group: group,
                 fixed,
                 x: fixed ? 0 : undefined,
@@ -260,6 +273,7 @@ export const processTransactions = (
                 title: undefined, // Remove title to prevent default tooltip
                 color: nodeColor,
                 borderWidth: isSmartMoney ? 4 : 2,
+                tokenBalance: tokenBalance,
             };
         });
 
