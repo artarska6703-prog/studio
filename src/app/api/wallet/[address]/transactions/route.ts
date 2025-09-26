@@ -68,7 +68,10 @@ function toFlattened(
         const tokenAmount = typeof t.tokenAmount === "number" ? t.tokenAmount : 0;
         if (!tokenAmount) continue;
 
-        const mint = t.mint || "";
+        // CRITICAL FIX: Ensure mint exists before processing
+        const mint = t.mint;
+        if (!mint) continue;
+
         const outgoing = t.fromUserAccount === walletAddress;
         const signedTokenAmount = outgoing ? -tokenAmount : tokenAmount;
         const price = prices[mint] ?? 0;
