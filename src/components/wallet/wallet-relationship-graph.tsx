@@ -93,13 +93,11 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
   const edgesDataSetRef = useRef(new DataSet<GraphLink>());
   
-  const [maxDepth, setMaxDepth] = useState(3);
   const [minVolume, setMinVolume] = useState(0);
   const debouncedMinVolume = useDebounce(minVolume, 500);
   const [minTransactions, setMinTransactions] = useState(1);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(legendItems.map(i => i.key));
   const [expandedNodeIds, setExpandedNodeIds] = useState(new Set<string>([walletAddress]));
-  const [physicsState, setPhysicsState] = useState<PhysicsState>({ solver: "barnesHut", gravitationalConstant: -8000, centralGravity: 0.1, springLength: 120, springConstant: 0.08, damping: 0.8, avoidOverlap: 0.7 });
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
@@ -143,9 +141,11 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
   useEffect(() => {
     if (onDiagnosticDataUpdate) {
-      onDiagnosticDataUpdate({ nodes, links, physics: physicsState });
+        // Since physics is disabled, we pass a default state.
+        const defaultPhysics: PhysicsState = { solver: "hierarchicalRepulsion", gravitationalConstant: 0, centralGravity: 0, springLength: 0, springConstant: 0, damping: 0, avoidOverlap: 0 };
+        onDiagnosticDataUpdate({ nodes, links, physics: defaultPhysics });
     }
-  }, [nodes, links, physicsState, onDiagnosticDataUpdate]);
+  }, [nodes, links, onDiagnosticDataUpdate]);
 
   const handleNodeTypeToggle = (key: string, checked: boolean) => {
     setVisibleNodeTypes(prev => {
@@ -199,13 +199,18 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         autoResize: true,
         height: '100%',
         width: '100%',
-        physics: {
-            ...physicsState,
-            stabilization: {
+        layout: {
+            hierarchical: {
                 enabled: true,
-                iterations: 200, // Number of iterations to run before layout is considered stable
-                fit: true
+                direction: 'UD',
+                sortMethod: 'directed',
+                nodeSpacing: 150,
+                treeSpacing: 200,
+                levelSeparation: 175,
             }
+        },
+        physics: {
+            enabled: false, // Disable physics for performance and stability
         },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
@@ -215,7 +220,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
         },
         edges: {
-            smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
+            smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 },
             color: { color: 'rgba(255,255,255,0.2)', highlight: 'rgba(255,255,255,0.5)' },
             arrows: { to: { enabled: true, scaleFactor: 0.5 } }
         },
@@ -228,10 +233,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       edges: edgesDataSetRef.current
     }, options);
     
-    networkInstance.on('stabilizationIterationsDone', () => {
-        networkInstance.setOptions({ physics: false });
-    });
-
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
             setSelectedNodeAddress(clickedNodes[0]);
@@ -261,13 +262,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
 
-  // Effect to apply physics changes
-  useEffect(() => {
-    if (networkRef.current) {
-        networkRef.current.setOptions({ physics: physicsState });
-        networkRef.current.stabilize();
-    }
-  }, [physicsState])
 
   return (
     <Card className="bg-transparent border-0 shadow-none">
