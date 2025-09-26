@@ -228,12 +228,40 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     setTimelineValue(timeRange.max);
   }
 
+  // Effect for updating data in the datasets
   useEffect(() => {
-    if (!containerRef.current) return;
-    
-    nodesDataSetRef.current = new DataSet(nodes);
-    edgesDataSetRef.current = new DataSet(links);
+      if (!networkRef.current) return;
 
+      const newNodes = new DataSet(nodes);
+      const newEdges = new DataSet(links);
+
+      const oldNodeIds = new Set(nodesDataSetRef.current.getIds());
+      const newNodeIds = new Set(newNodes.getIds());
+
+      const nodesToAdd = (newNodes.get() as GraphNode[]).filter(node => !oldNodeIds.has(node.id!));
+      const nodesToRemove = Array.from(oldNodeIds).filter(id => !newNodeIds.has(id));
+      
+      // We can also update existing nodes if their properties change, but for now, we just add/remove.
+      if (nodesToAdd.length > 0) nodesDataSetRef.current.add(nodesToAdd);
+      if (nodesToRemove.length > 0) nodesDataSetRef.current.remove(nodesToRemove);
+
+      // Same logic for edges
+      const oldEdgeIds = new Set(edgesDataSetRef.current.getIds());
+      const newEdgeIds = new Set(newEdges.getIds());
+      
+      const edgesToAdd = (newEdges.get() as GraphLink[]).filter(edge => !oldEdgeIds.has(edge.id!));
+      const edgesToRemove = Array.from(oldEdgeIds).filter(id => !newEdgeIds.has(id));
+
+      if (edgesToAdd.length > 0) edgesDataSetRef.current.add(edgesToAdd);
+      if (edgesToRemove.length > 0) edgesDataSetRef.current.remove(edgesToRemove);
+      
+  }, [nodes, links]);
+
+
+  // Effect for initializing the network instance once
+  useEffect(() => {
+    if (!containerRef.current || networkRef.current) return;
+    
     const options: Options = {
         autoResize: true,
         height: '100%',
@@ -315,7 +343,8 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       networkInstance.destroy();
       networkRef.current = null;
     }
-  }, [nodes, links, walletAddress]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletAddress]);
 
   return (
     <Card className="bg-transparent border-0 shadow-none">
@@ -380,3 +409,5 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     </Card>
   );
 }
+
+    
