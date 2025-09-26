@@ -159,10 +159,34 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
 
   // Effect for updating data in the datasets
   useEffect(() => {
-    nodesDataSetRef.current.clear();
-    edgesDataSetRef.current.clear();
-    nodesDataSetRef.current.add(nodes);
-    edgesDataSetRef.current.add(links);
+    const currentNodes = nodesDataSetRef.current.get({ returnType: "Array" }) as GraphNode[];
+    const currentNodeIds = new Set(currentNodes.map(n => n.id));
+    const newNodeIds = new Set(nodes.map(n => n.id));
+
+    const nodesToRemove = [...currentNodeIds].filter(id => !newNodeIds.has(id));
+    const nodesToAdd = nodes.filter(node => !currentNodeIds.has(node.id));
+
+    if (nodesToRemove.length > 0) {
+      nodesDataSetRef.current.remove(nodesToRemove);
+    }
+    if (nodesToAdd.length > 0) {
+      nodesDataSetRef.current.add(nodesToAdd);
+    }
+
+    const currentEdges = edgesDataSetRef.current.get({ returnType: "Array" }) as GraphLink[];
+    const currentEdgeIds = new Set(currentEdges.map(e => e.id));
+    const newEdgeIds = new Set(links.map(l => l.id));
+
+    const edgesToRemove = [...currentEdgeIds].filter(id => !newEdgeIds.has(id as string));
+    const edgesToAdd = links.filter(link => !currentEdgeIds.has(link.id));
+    
+    if (edgesToRemove.length > 0) {
+        edgesDataSetRef.current.remove(edgesToRemove as string[]);
+    }
+    if (edgesToAdd.length > 0) {
+        edgesDataSetRef.current.add(edgesToAdd);
+    }
+
   }, [nodes, links]);
 
 
@@ -270,3 +294,5 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     </Card>
   );
 }
+
+    
