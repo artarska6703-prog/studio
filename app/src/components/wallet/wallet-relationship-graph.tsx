@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Transaction, WalletDetails } from '@/lib/types';
 import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
-import { processTransactions, groupStyles, PhysicsState } from './wallet-relationship-graph-utils';
+import { processTransactions, groupStyles, PhysicsState, AddressTagInfo } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
 import { WalletDetailSheet } from './wallet-detail-sheet';
@@ -20,6 +20,7 @@ import { Settings } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
+import { LocalTag } from '@/lib/tag-store';
 
 export type DiagnosticData = {
   nodes: GraphNode[];
@@ -27,19 +28,15 @@ export type DiagnosticData = {
   physics: PhysicsState;
 }
 
-type AddressNameAndTags = {
-  name: string;
-  tags: string[];
-};
-
 interface WalletNetworkGraphProps {
     walletAddress: string;
     transactions: Transaction[];
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
-    addressTags: Record<string, AddressNameAndTags>;
+    addressTags: Record<string, LocalTag>;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
     isLoading: boolean;
+    onTagUpdate: () => void;
 }
 
 
@@ -78,9 +75,11 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   return (
     <div className={cn("absolute p-3 rounded-lg shadow-lg text-xs w-64 z-10 pointer-events-none", "bg-popover text-popover-foreground border")} style={{ left: `${position.x}px`, top: `${position.y}px` }}>
       <div className="font-bold border-b border-border pb-1 mb-2 capitalize">
-        {node.type}: {shortenAddress(node.id, 6)}
+        {node.label}
       </div>
       <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+        <div className="text-muted-foreground">Type:</div>
+        <div className="text-right font-mono">{node.type}</div>
         <div className="text-muted-foreground">Balance:</div>
         <div className="text-right font-mono">{node.balance.toFixed(2)} SOL</div>
         <div className="text-muted-foreground">Value (USD):</div>
@@ -92,7 +91,7 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading, onTagUpdate }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -127,19 +126,17 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         const passesFilters = 
             (node.balanceUSD ?? 0) >= debouncedMinVolume &&
             node.transactionCount >= minTransactions &&
-            (visibleNodeTypes.includes(node.type) || isRoot);
+            (visibleNodeTypes.includes(node.type) || groupStyles[node.type] === undefined || isRoot);
 
         return passesFilters;
     });
 
     const visibleNodeIds = new Set(nodesWithFilters.map(n => n.id));
 
-    // Filter links to only include those between visible nodes
     const filteredLinks = allGraphData.links.filter(link => 
         visibleNodeIds.has(link.from) && visibleNodeIds.has(link.to)
     );
     
-    // Determine the final set of nodes to display: all nodes that pass filters AND any nodes that are part of a visible link
     const nodesInVisibleLinks = new Set<string>();
     filteredLinks.forEach(link => {
         nodesInVisibleLinks.add(link.from);
@@ -172,7 +169,6 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
     })
   }
 
-  // Effect for updating data in the datasets
   useEffect(() => {
       if (!networkRef.current) return;
 
@@ -182,9 +178,9 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       const nodesToRemove = new Set(Object.keys(currentNodes));
 
       for (const node of nodes) {
-        if (currentNodes[node.id]) { // Node exists, check if update is needed
+        if (currentNodes[node.id]) {
             nodesToUpdate.push(node);
-        } else { // New node
+        } else {
             nodesToAdd.push(node);
         }
         nodesToRemove.delete(node.id);
@@ -200,7 +196,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       const edgesToRemove = new Set(Object.keys(currentEdges));
 
       for (const link of links) {
-        const edgeId = `${link.from}-${link.to}`; // Assuming a consistent ID format
+        const edgeId = `${link.from}-${link.to}`; 
         if (currentEdges[edgeId]) {
             edgesToUpdate.push({id: edgeId, ...link});
         } else {
@@ -213,16 +209,14 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       if(edgesToUpdate.length > 0) edgesDataSetRef.current.update(edgesToUpdate);
       if(edgesToRemove.size > 0) edgesDataSetRef.current.remove(Array.from(edgesToRemove));
 
-      // Re-enable physics for re-stabilization, then disable again
       if (nodesToAdd.length > 0 || nodesToRemove.size > 0) {
         networkRef.current.setOptions({ physics: { enabled: true } });
-        networkRef.current.stabilize(200); // Stabilize for a few iterations
+        networkRef.current.stabilize(200);
       }
       
   }, [nodes, links]);
 
 
-  // Effect for initializing and managing the network instance
   useEffect(() => {
     if (!containerRef.current || isLoading) {
       return;
@@ -233,7 +227,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         height: '100%',
         width: '100%',
         physics: {
-          enabled: true, // Start with physics enabled
+          enabled: true,
           ...physics
         },
         nodes: {
@@ -417,7 +411,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         </div>
       </CardContent>
       {selectedNodeAddress && (
-        <WalletDetailSheet address={selectedNodeAddress} open={isSheetOpen} onOpenChange={setIsSheetOpen} />
+        <WalletDetailSheet address={selectedNodeAddress} open={isSheetOpen} onOpenChange={setIsSheetOpen} onTagUpdate={onTagUpdate} />
       )}
     </Card>
   );

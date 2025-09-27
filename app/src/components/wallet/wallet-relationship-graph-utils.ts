@@ -3,6 +3,7 @@ import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Transaction, FlattenedTransaction, WalletDetails } from '@/lib/types';
 import { shortenAddress } from '@/lib/solana-utils';
 import { formatCurrency } from '@/lib/utils';
+import { LocalTag } from '@/lib/tag-store';
 
 export interface GraphNode extends Node {
     id: string;
@@ -34,31 +35,25 @@ export interface PhysicsState {
   avoidOverlap: number;
 }
 
-type AddressNameAndTags = {
+export type AddressTagInfo = {
     name: string;
-    tags: string[];
+    type: string;
 };
+
 
 const getNodeType = (
     address: string, 
     balance: number, 
     balanceUSD: number | null, 
-    tagsAndName?: AddressNameAndTags
+    localTag?: LocalTag
     ): string => {
     
-    // 1. Prioritize Helius tags and names
-    if (tagsAndName) {
-        const { name, tags } = tagsAndName;
-        const lowerName = name?.toLowerCase() || '';
-
-        if (tags.includes('protocol') || tags.includes('dex')) return 'platform';
-        if (tags.includes('exchange') || tags.includes('cex')) return 'exchange';
-        if (tags.includes('bridge')) return 'bridge';
-
-        if (lowerName.includes('pump.fun')) return 'platform';
+    // 1. Prioritize local manual tags
+    if (localTag && localTag.type) {
+        return localTag.type;
     }
     
-    // 2. Fallback to keyword matching on address if no tags
+    // 2. Fallback to keyword matching on address
     const lowerAddress = address.toLowerCase();
     const keywords = {
         exchange: ['binance', 'coinbase', 'kraken', 'ftx', 'kucoin'],
@@ -84,7 +79,7 @@ const getNodeType = (
     return 'shrimp';
 };
 
-const getMass = (balance: number, balanceUSD: number | null, tokenBalance?: number) => {
+const getMass = (balance: number, balanceUSD: number | null, localTag?: LocalTag, tokenBalance?: number) => {
     let value = 0;
     if (tokenBalance && tokenBalance > 0) {
         value = tokenBalance; 
@@ -93,7 +88,7 @@ const getMass = (balance: number, balanceUSD: number | null, tokenBalance?: numb
     }
     
     const baseMass = Math.log1p(value) || 1;
-    const type = getNodeType('', balance, balanceUSD);
+    const type = getNodeType('', balance, balanceUSD, localTag);
 
     if (type === 'exchange' || type === 'platform') return baseMass * 50;
     if (type === 'whale') return baseMass * 10;
@@ -102,17 +97,16 @@ const getMass = (balance: number, balanceUSD: number | null, tokenBalance?: numb
     return baseMass;
 }
 
-const getNodeSize = (balance: number, balanceUSD: number | null, tokenBalance?: number) => {
+const getNodeSize = (balance: number, balanceUSD: number | null, localTag?: LocalTag, tokenBalance?: number) => {
     let value = 0;
     if (tokenBalance && tokenBalance > 0) {
-        // We don't have price, so just use amount for relative sizing
         value = tokenBalance;
     } else {
         value = (balanceUSD !== null && balanceUSD > 0) ? balanceUSD : (balance * 150);
     }
 
     const baseSize = 5 + Math.log1p(value || 1);
-    const type = getNodeType('', balance, balanceUSD);
+    const type = getNodeType('', balance, balanceUSD, localTag);
     
     if (type === 'exchange' || type === 'platform') return baseSize * 3.5;
     if (type === 'whale') return baseSize * 2.5;
@@ -129,7 +123,7 @@ export const processTransactions = (
     extraWalletBalances: Record<string, number>,
     expandedNodeIds: Set<string>,
     tokenBalances: Record<string, number> = {},
-    addressTags: Record<string, AddressNameAndTags> = {}
+    addressTags: Record<string, LocalTag> = {}
 ): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
@@ -168,7 +162,6 @@ export const processTransactions = (
             }
         });
 
-        // Calculate Net Flow
         if (from && value > 0) {
             addressData[from].netFlow -= value;
         }
@@ -192,7 +185,6 @@ export const processTransactions = (
                 allLinks[linkId].volume += Math.abs(value);
             }
 
-            // Aggregate token volumes
             if ('tokenMint' in tx && tx.tokenMint && tx.tokenSymbol && tx.tokenAmount) {
                 const tokenMint = tx.tokenMint;
                 const current = allLinks[linkId].tokenVolumes.get(tokenMint) || { amount: 0, symbol: tx.tokenSymbol };
@@ -200,15 +192,12 @@ export const processTransactions = (
                 allLinks[linkId].tokenVolumes.set(tokenMint, current);
             }
 
-
-            // This is now used for edge weight in hierarchical view
             allLinks[linkId].width = Math.log2(allLinks[linkId].volume + 1);
         }
     });
     
     const visibleNodes = new Set<string>();
 
-    // Initial population based on depth from root
     if (Object.keys(addressData).includes(rootAddress)) {
       const queue: [string, number][] = [[rootAddress, 0]];
       const visited = new Set<string>([rootAddress]);
@@ -230,10 +219,9 @@ export const processTransactions = (
       }
     }
 
-    // Add nodes connected to manually expanded nodes
     expandedNodeIds.forEach(expandedId => {
         if (!adjacencyList[expandedId]) return;
-        visibleNodes.add(expandedId); // Ensure the expanded node itself is visible
+        visibleNodes.add(expandedId); 
         const neighbors = adjacencyList[expandedId];
         for (const neighbor of neighbors) {
             visibleNodes.add(neighbor);
@@ -242,11 +230,10 @@ export const processTransactions = (
     
     
     if(visibleNodes.size === 0 && Object.keys(addressData).length > 0) {
-        // Fallback if root address not in data, show all.
         Object.keys(addressData).forEach(id => visibleNodes.add(id));
     }
 
-    const SMART_MONEY_THRESHOLD_USD = 50000; // e.g., Net inflow of $50k
+    const SMART_MONEY_THRESHOLD_USD = 50000;
     
     const nodes: GraphNode[] = Object.keys(addressData)
         .filter(address => visibleNodes.has(address))
@@ -255,9 +242,11 @@ export const processTransactions = (
             const balance = addressBalances[address] || 0;
             const balanceUSD = solPrice ? balance * solPrice : null; 
             const tokenBalance = tokenBalances[address];
-            let nodeType = getNodeType(address, balance, balanceUSD, addressTags[address]);
-            let group = nodeType;
-            let label = addressTags[address]?.name || shortenAddress(address, 4);
+            const localTag = addressTags[address];
+            
+            let nodeType = getNodeType(address, balance, balanceUSD, localTag);
+            let group = groupStyles[nodeType] ? nodeType : 'shrimp'; // Fallback to shrimp if type is custom
+            let label = localTag?.name || shortenAddress(address, 4);
             let fixed = false;
 
             if (address === rootAddress) {
@@ -268,14 +257,15 @@ export const processTransactions = (
             }
 
             const isSmartMoney = netFlow > SMART_MONEY_THRESHOLD_USD && group !== 'root';
+            const finalGroupStyle = groupStyles[group];
             const nodeColor = isSmartMoney ? { 
                 border: 'hsl(var(--accent))',
-                background: groupStyles[group]?.color?.background,
+                background: finalGroupStyle?.color?.background,
                 highlight: {
                   border: 'hsl(var(--accent))',
-                  background: groupStyles[group]?.color?.highlight?.background,
+                  background: finalGroupStyle?.color?.highlight?.background,
                 },
-              } : undefined;
+              } : finalGroupStyle?.color;
 
             return {
                 id: address,
@@ -287,14 +277,14 @@ export const processTransactions = (
                 type: nodeType,
                 notes: '',
                 shape: 'dot',
-                value: getNodeSize(balance, balanceUSD, tokenBalance),
-                mass: getMass(balance, balanceUSD, tokenBalance),
+                value: getNodeSize(balance, balanceUSD, localTag, tokenBalance),
+                mass: getMass(balance, balanceUSD, localTag, tokenBalance),
                 group: group,
                 fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
-                title: undefined, // Remove title to prevent default tooltip
-                color: nodeColor,
+                title: undefined,
+                color: nodeColor as any,
                 borderWidth: isSmartMoney ? 4 : 2,
                 tokenBalance: tokenBalance,
             };

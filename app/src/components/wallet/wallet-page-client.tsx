@@ -27,6 +27,7 @@ import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
 import { useToast } from "@/hooks/use-toast";
 import { shortenAddress } from "@/lib/solana-utils";
 import { useSearchParams } from "next/navigation";
+import { getAllTags, type LocalTag } from "@/lib/tag-store";
 
 const TXN_PAGE_SIZE = 100;
 
@@ -39,6 +40,7 @@ type WalletPageViewProps = {
 type AddressNameAndTags = {
   name: string;
   tags: string[];
+  type?: string; // For local tags
 };
 
 export function WalletPageView({ address }: WalletPageViewProps) {
@@ -46,7 +48,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [walletDetails, setWalletDetails] = useState<WalletDetails | null>(null);
   const [allTransactions, setAllTransactions] = useState<FlattenedTransaction[]>([]);
   const [extraWalletBalances, setExtraWalletBalances] = useState<Record<string, number>>({});
-  const [addressTags, setAddressTags] = useState<Record<string, AddressNameAndTags>>({});
+  const [localAddressTags, setLocalAddressTags] = useState<Record<string, LocalTag>>({});
   const [specificTokenBalances, setSpecificTokenBalances] = useState<Record<string, number>>({});
   const [nextSignature, setNextSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,18 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const { toast } = useToast();
   const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'portfolio');
+
+  const refreshLocalTags = useCallback(() => {
+    setLocalAddressTags(getAllTags());
+  }, []);
+
+  useEffect(() => {
+    refreshLocalTags();
+    window.addEventListener('storage', refreshLocalTags);
+    return () => {
+      window.removeEventListener('storage', refreshLocalTags);
+    };
+  }, [refreshLocalTags]);
 
 
   const fetchBalances = async (addresses: string[], tokenMint?: string) => {
@@ -85,26 +99,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     }
   };
 
-  const fetchAddressNames = useCallback(async (addresses: string[]) => {
-    if (addresses.length === 0) return;
-    try {
-      const res = await fetch('/api/wallet/names', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses }),
-      });
-      if (!res.ok) {
-        console.error('Failed to fetch address names/tags');
-        return;
-      }
-      const { namesAndTags } = await res.json();
-      setAddressTags((prev) => ({ ...prev, ...namesAndTags }));
-    } catch (e) {
-      console.error('Error fetching address names/tags', e);
-    }
-  }, []);
-
-
   const fetchTransactions = useCallback(async (before?: string) => {
     setIsFetchingMore(true);
     setError(null);
@@ -125,7 +119,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
         setNextSignature(data.nextCursor);
 
-        // The transactions endpoint now returns prices
         if (data.prices) {
             setTokenPrices(prev => ({...prev, ...data.prices}));
         }
@@ -141,17 +134,12 @@ export function WalletPageView({ address }: WalletPageViewProps) {
            await fetchBalances(addressesToFetchBalances);
         }
         
-        const addressesToFetchNames = Array.from(newAddresses).filter(addr => !(addr in addressTags));
-        if (addressesToFetchNames.length > 0) {
-          await fetchAddressNames(addressesToFetchNames);
-        }
-
     } catch (e: any) {
         setError(e.message);
     } finally {
         setIsFetchingMore(false);
     }
-  }, [address, extraWalletBalances, addressTags, fetchAddressNames]);
+  }, [address, extraWalletBalances]);
   
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -159,7 +147,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         setError(null);
         setAllTransactions([]);
         setExtraWalletBalances({});
-        setAddressTags({});
         setNextSignature(null);
 
         try {
@@ -170,7 +157,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             }
             const details = await detailsRes.json();
             setWalletDetails(details);
-            await fetchAddressNames([address]);
             
             await fetchTransactions();
 
@@ -195,7 +181,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
         ] });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, useMockData, fetchAddressNames]);
+  }, [address, useMockData]);
 
   const liveTransactions = useMemo(() => {
     if (useMockData) {
@@ -229,7 +215,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     }
   }
 
-  // Enriched token data with prices
   const enrichedTokens: TokenHolding[] | undefined = useMemo(() => {
       return walletDetails?.tokens.map(token => {
           const price = tokenPrices[token.mint] ?? 0;
@@ -375,7 +360,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
                     extraWalletBalances={extraWalletBalances}
-                    addressTags={addressTags}
+                    addressTags={localAddressTags}
+                    onTagUpdate={refreshLocalTags}
                     isLoading={isLoading}
                 />
             </TabsContent>
