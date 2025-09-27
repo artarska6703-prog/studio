@@ -54,21 +54,23 @@ export async function GET(
 
     const tokens: TokenHolding[] = [];
 
-    for (const asset of result.items) {
-      if (asset.interface === 'FungibleToken' && asset.token_info) {
-        const price = asset.token_info.price_info?.price_per_token || 0;
-        const amount = asset.token_info.balance / Math.pow(10, asset.token_info.decimals);
-        tokens.push({
-          mint: asset.id,
-          name: asset.content?.metadata?.name || 'Unknown Token',
-          symbol: asset.content?.metadata?.symbol || '???',
-          amount: amount,
-          decimals: asset.token_info.decimals,
-          price: price,
-          valueUSD: amount * price,
-          icon: asset.content?.links?.image,
-          tokenStandard: asset.token_info.token_program,
-        });
+    if (result.items) {
+      for (const asset of result.items) {
+        if (asset.interface === 'FungibleToken' && asset.token_info) {
+          const price = asset.token_info.price_info?.price_per_token || 0;
+          const amount = asset.token_info.balance / Math.pow(10, asset.token_info.decimals);
+          tokens.push({
+            mint: asset.id,
+            name: asset.content?.metadata?.name || 'Unknown Token',
+            symbol: asset.content?.metadata?.symbol || '???',
+            amount: amount,
+            decimals: asset.token_info.decimals,
+            price: price,
+            valueUSD: amount * price,
+            icon: asset.content?.links?.image,
+            tokenStandard: asset.token_info.token_program,
+          });
+        }
       }
     }
     
