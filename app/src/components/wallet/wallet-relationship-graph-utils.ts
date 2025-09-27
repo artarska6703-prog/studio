@@ -46,7 +46,7 @@ function getLabelsFromTransactions(transactions: FlattenedTransaction[]): string
   if (!transactions) return [];
 
   for (const tx of transactions) {
-    const programName = (tx as any).programInfo?.name?.toLowerCase();
+    const programName = tx.programInfo?.name?.toLowerCase();
 
     if (programName?.includes('magic eden')) labels.add('NFT Trader');
     if (programName?.includes('tensor')) labels.add('NFT Trader');
@@ -54,7 +54,7 @@ function getLabelsFromTransactions(transactions: FlattenedTransaction[]): string
     if (programName?.includes('raydium')) labels.add('DEX User');
     if (programName?.includes('orca')) labels.add('DEX User');
     if (tx.events?.nft) labels.add('NFT Collector');
-    if (tx.type === 'SWAP') labels.add('DeFi User');
+    if (tx.type === 'program_interaction' && tx.instruction?.toLowerCase() === 'swap') labels.add('DeFi User');
     if (tx.instruction?.toLowerCase().includes('stake')) labels.add('Staker');
   }
 
