@@ -65,7 +65,7 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate, de
 
   useEffect(() => {
     if (open && address) {
-      setIsLoading(!details); // If details are passed, we are not loading.
+      setIsLoading(!details); 
       setIsEditingTag(false);
       const tag = getTag(address);
       setLocalTag(tag);
@@ -127,12 +127,12 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate, de
                 <AccordionContent className="space-y-2">
                     <StatItem
                         label="SOL Balance"
-                        isLoading={isLoading}
+                        isLoading={!details}
                         value={details ? `${details.sol.balance.toFixed(4)} SOL` : ''}
                     />
                     <StatItem
                         label="SOL Value (USD)"
-                        isLoading={isLoading}
+                        isLoading={!details}
                         value={details ? formatCurrency(details.sol.valueUSD || 0) : ''}
                     />
                     <div className="flex justify-between items-center text-sm">

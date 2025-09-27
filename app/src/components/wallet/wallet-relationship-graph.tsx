@@ -38,7 +38,6 @@ interface WalletNetworkGraphProps {
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
     isLoading: boolean;
     onTagUpdate: () => void;
-    enrichedTokens: any; // Add this prop
 }
 
 
@@ -103,7 +102,7 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading, onTagUpdate, enrichedTokens }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading, onTagUpdate }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -114,6 +113,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [minTransactions, setMinTransactions] = useState(1);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(legendItems.map(i => i.key));
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
+  const [selectedNodeDetails, setSelectedNodeDetails] = useState<WalletDetails | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [physics, setPhysics] = useState<PhysicsState>({
@@ -274,7 +274,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       networkInstance.setOptions({ physics: false });
     });
     
-    networkInstance.on('click', ({ nodes: clickedNodes }) => {
+    networkInstance.on('click', async ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
             setSelectedNodeAddress(clickedNodes[0]);
             setIsSheetOpen(true);
@@ -422,14 +422,14 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
           <CustomTooltip node={tooltipData.node} position={tooltipData.position} />
         </div>
       </CardContent>
-      {selectedNodeAddress && walletDetails && (
+      {selectedNodeAddress && (
         <WalletDetailSheet
             address={selectedNodeAddress}
             open={isSheetOpen}
             onOpenChange={setIsSheetOpen}
             onTagUpdate={onTagUpdate}
-            details={walletDetails}
-            enrichedTokens={enrichedTokens}
+            details={selectedNodeDetails}
+            enrichedTokens={[]}
         />
       )}
     </Card>

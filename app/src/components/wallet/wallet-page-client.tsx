@@ -358,7 +358,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     addressTags={localAddressTags}
                     onTagUpdate={refreshLocalTags}
                     isLoading={isLoading}
-                    enrichedTokens={enrichedTokens}
                 />
             </TabsContent>
             <TabsContent value="graph-v2" className="mt-6">
