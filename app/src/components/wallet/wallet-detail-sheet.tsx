@@ -22,6 +22,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '../ui/accordion';
+import { LocalTag, saveTag, getTag } from '@/lib/tag-store';
+import { Input } from '../ui/input';
 
 interface WalletDetailSheetProps {
   address: string;
@@ -54,9 +56,19 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
   const [copied, setCopied] = useState(false);
   const [details, setDetails] = useState<WalletDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [localTag, setLocalTag] = useState<LocalTag | null>(null);
+  const [isEditingTag, setIsEditingTag] = useState(false);
+  const [tagName, setTagName] = useState('');
+  const [tagType, setTagType] = useState('');
 
   useEffect(() => {
     if (open && address) {
+      setIsEditingTag(false);
+      const tag = getTag(address);
+      setLocalTag(tag);
+      setTagName(tag?.name || '');
+      setTagType(tag?.type || '');
+
       const fetchData = async () => {
         setIsLoading(true);
         setDetails(null);
@@ -98,8 +110,17 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
       });
   };
 
-  const sheetTitle = shortenAddress(address, 12);
-  const sheetDescription = `A summary of this wallet's balance and token holdings.`;
+  const handleSaveTag = () => {
+    const newTag: LocalTag = { name: tagName, type: tagType };
+    saveTag(address, newTag);
+    setLocalTag(newTag);
+    setIsEditingTag(false);
+    onTagUpdate(); // Notify parent to refresh tags
+    toast({ title: "Tag Saved", description: `Address tagged as "${tagName}".`});
+  }
+
+  const sheetTitle = localTag?.name || shortenAddress(address, 12);
+  const sheetDescription = localTag?.type || `A summary of this wallet's holdings.`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -151,6 +172,47 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
                             </span>
                         )}
                     </div>
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="tagging">
+                 <AccordionTrigger className="font-semibold text-base py-2">
+                    <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        Manual Tagging
+                    </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                    {isEditingTag ? (
+                        <div className="space-y-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="tagName">Custom Name</Label>
+                                <Input id="tagName" value={tagName} onChange={(e) => setTagName(e.target.value)} placeholder="e.g., My Burner Wallet"/>
+                            </div>
+                             <div className="space-y-1">
+                                <Label htmlFor="tagType">Category / Type</Label>
+                                <Input id="tagType" value={tagType} onChange={(e) => setTagType(e.target.value)} placeholder="e.g., friend, degen, CEX"/>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="ghost" onClick={() => setIsEditingTag(false)}>Cancel</Button>
+                                <Button onClick={handleSaveTag}>Save Tag</Button>
+                            </div>
+                        </div>
+                    ) : (
+                         <div className="flex flex-col items-center justify-center text-center gap-3 py-4">
+                            {localTag ? (
+                                <>
+                                    <p className="text-sm text-muted-foreground">This wallet is tagged as:</p>
+                                    <p><span className="font-bold">{localTag.name}</span> ({localTag.type})</p>
+                                    <Button onClick={() => setIsEditingTag(true)}>Edit Tag</Button>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm text-muted-foreground">No custom tag applied.</p>
+                                    <Button onClick={() => setIsEditingTag(true)}>Add Tag</Button>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
