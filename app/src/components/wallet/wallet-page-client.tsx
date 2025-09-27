@@ -51,7 +51,6 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [mockScenario, setMockScenario] = useState<MockScenario>('balanced');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const { toast } = useToast();
-  const [addressTags, setAddressTags] = useState<Record<string, any>>({});
   const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'portfolio');
 
@@ -334,7 +333,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     transactions={liveTransactions}
                     walletDetails={walletDetails}
                     extraWalletBalances={extraWalletBalances}
-                    addressTags={addressTags}
+                    addressTags={{}}
                     isLoading={isLoading}
                 />
             </TabsContent>

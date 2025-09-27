@@ -38,7 +38,6 @@ export async function GET(
           limit: 1000,
           displayOptions: {
             showFungible: true,
-            showNativeBalance: true, // Explicitly request native SOL balance
           },
         },
       }),
@@ -52,30 +51,29 @@ export async function GET(
 
     const { result } = await response.json();
 
+    let solBalance = 0;
     const tokens: TokenHolding[] = [];
 
-    if (result.items) {
-      for (const asset of result.items) {
-        if (asset.interface === 'FungibleToken' && asset.token_info) {
-          const price = asset.token_info.price_info?.price_per_token || 0;
-          const amount = asset.token_info.balance / Math.pow(10, asset.token_info.decimals);
-          tokens.push({
-            mint: asset.id,
-            name: asset.content?.metadata?.name || 'Unknown Token',
-            symbol: asset.content?.metadata?.symbol || '???',
-            amount: amount,
-            decimals: asset.token_info.decimals,
-            price: price,
-            valueUSD: amount * price,
-            icon: asset.content?.links?.image,
-            tokenStandard: asset.token_info.token_program,
-          });
-        }
+    for (const asset of result.items) {
+      if (asset.id === SOL_MINT) {
+        solBalance = asset.token_info?.balance / LAMPORTS_PER_SOL || 0;
+      } else if (asset.interface === 'FungibleToken' && asset.token_info) {
+        const price = asset.token_info.price_info?.price_per_token || 0;
+        const amount = asset.token_info.balance / Math.pow(10, asset.token_info.decimals);
+        tokens.push({
+          mint: asset.id,
+          name: asset.content?.metadata?.name || 'Unknown Token',
+          symbol: asset.content?.metadata?.symbol || '???',
+          amount: amount,
+          decimals: asset.token_info.decimals,
+          price: price,
+          valueUSD: amount * price,
+          icon: asset.content?.links?.image,
+          tokenStandard: asset.token_info.token_program,
+        });
       }
     }
     
-    // Correctly get SOL balance and price from the `nativeBalance` object
-    const solBalance = (result.nativeBalance?.lamports || 0) / LAMPORTS_PER_SOL;
     const solPrice = result.nativeBalance?.price_per_sol || 0;
     const solValueUSD = solBalance * solPrice;
 
