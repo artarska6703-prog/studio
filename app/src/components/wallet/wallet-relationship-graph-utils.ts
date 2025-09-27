@@ -137,7 +137,7 @@ const getNodeSize = (balance: number, balanceUSD: number | null, localTag?: Loca
 }
 
 export const processTransactions = (
-    transactions: (Transaction | FlattenedTransaction)[],
+    transactions: FlattenedTransaction[],
     rootAddress: string,
     maxDepth: number,
     walletDetails: WalletDetails | null,
@@ -162,10 +162,9 @@ export const processTransactions = (
     const adjacencyList: { [key: string]: string[] } = {};
 
     transactions.forEach(tx => {
-        const flatTx = tx as FlattenedTransaction;
-        const from = flatTx.from;
-        const to = flatTx.to;
-        const value = flatTx.valueUSD ?? 0;
+        const from = tx.from;
+        const to = tx.to;
+        const value = tx.valueUSD ?? 0;
 
         const participants = new Set([from, to].filter(Boolean) as string[]);
         
@@ -177,7 +176,7 @@ export const processTransactions = (
                 adjacencyList[address] = [];
             }
             addressData[address].txCount++;
-            addressData[address].transactions.push(flatTx);
+            addressData[address].transactions.push(tx);
             
             if (value > 0) {
                  addressData[address].interactionVolume += value;

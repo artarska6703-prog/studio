@@ -54,6 +54,8 @@ function toFlattened(
           instruction: tx.type,
           interactedWith: Array.from(new Set(participants)).filter(a => a !== walletAddress),
           valueUSD: Math.abs(signedAmount) * price,
+          events: tx.events,
+          programInfo: tx.programInfo,
         });
         isInteractionAdded = true;
       }
@@ -94,6 +96,8 @@ function toFlattened(
           tokenAmount: signedTokenAmount,
           tokenSymbol: symbol,
           tokenMint: mint,
+          events: tx.events,
+          programInfo: tx.programInfo,
         });
         isInteractionAdded = true;
       }
@@ -115,6 +119,8 @@ function toFlattened(
         instruction: tx.type,
         interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
         valueUSD: 0,
+        events: tx.events,
+        programInfo: tx.programInfo,
       });
     }
   }
