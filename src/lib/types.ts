@@ -44,6 +44,7 @@ export interface Transaction {
   nativeTransfers?: ParsedTransfer[];
   tokenTransfers?: ParsedTransfer[];
   events?: any;
+  programInfo?: any;
 }
 
 export interface FlattenedTransaction {
@@ -63,9 +64,13 @@ export interface FlattenedTransaction {
   instruction: string;
   interactedWith: string[];
   valueUSD: number;         // always numeric (>= 0), never null
-  
-  // Fields for SPL token transfers
-  tokenAmount?: number;      // signed (+in/-out) amount of the token
+
+  // ✅ Newly added fields for labeling logic
+  programInfo?: any;
+  events?: any;
+
+  // Optional: SPL token-specific data
+  tokenAmount?: number;      
   tokenSymbol?: string | null;
   tokenMint?: string | null;
 }
