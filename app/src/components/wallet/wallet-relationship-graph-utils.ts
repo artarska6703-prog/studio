@@ -1,5 +1,4 @@
 
-
 import { Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Transaction, FlattenedTransaction, WalletDetails } from '@/lib/types';
@@ -45,7 +44,20 @@ const getNodeType = (
     address: string, 
     balance: number, 
     balanceUSD: number | null, 
+    tagsAndName?: AddressNameAndTags
     ): string => {
+    
+    // 1. Prioritize Helius tags and names
+    if (tagsAndName) {
+        const { name, tags } = tagsAndName;
+        const lowerName = name?.toLowerCase() || '';
+
+        if (tags.includes('protocol') || tags.includes('dex')) return 'platform';
+        if (tags.includes('exchange') || tags.includes('cex')) return 'exchange';
+        if (tags.includes('bridge')) return 'bridge';
+
+        if (lowerName.includes('pump.fun')) return 'platform';
+    }
     
     // 2. Fallback to keyword matching on address if no tags
     const lowerAddress = address.toLowerCase();
@@ -118,6 +130,7 @@ export const processTransactions = (
     extraWalletBalances: Record<string, number>,
     expandedNodeIds: Set<string>,
     tokenBalances: Record<string, number> = {},
+    addressTags: Record<string, AddressNameAndTags> = {}
 ): { nodes: GraphNode[], links: GraphLink[] } => {
     if (!transactions || transactions.length === 0) {
         return { nodes: [], links: [] };
@@ -136,7 +149,7 @@ export const processTransactions = (
 
     transactions.forEach(tx => {
         const from = 'from' in tx ? tx.from : tx.feePayer;
-        const to = 'to' in tx ? tx.to : (tx.instructions && tx.instructions.length > 0) ? tx.instructions[0].programId : null;
+        const to = 'to' in tx ? tx.to : tx.instructions[0]?.programId;
         const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null) ?? 0;
 
 
@@ -243,9 +256,9 @@ export const processTransactions = (
             const balance = addressBalances[address] || 0;
             const balanceUSD = solPrice ? balance * solPrice : null; 
             const tokenBalance = tokenBalances[address];
-            let nodeType = getNodeType(address, balance, balanceUSD);
+            let nodeType = getNodeType(address, balance, balanceUSD, addressTags[address]);
             let group = nodeType;
-            let label = shortenAddress(address, 4);
+            let label = addressTags[address]?.name || shortenAddress(address, 4);
             let fixed = false;
 
             if (address === rootAddress) {
