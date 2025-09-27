@@ -36,10 +36,13 @@ export async function POST(request: NextRequest) {
       const results = await helius.rpc.getNames({ addresses: chunk });
 
       Object.keys(results).forEach((address) => {
-        namesAndTags[address] = {
-          name: results[address].name,
-          tags: results[address].tags,
-        };
+        // CRITICAL FIX: Check if Helius returned data for the address
+        if (results[address]) {
+            namesAndTags[address] = {
+              name: results[address].name,
+              tags: results[address].tags,
+            };
+        }
       });
     }
 
