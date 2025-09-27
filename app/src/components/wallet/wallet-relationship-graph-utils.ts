@@ -1,9 +1,8 @@
 
 import { Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
-import { Transaction, FlattenedTransaction, WalletDetails } from '@/lib/types';
+import { FlattenedTransaction, WalletDetails } from '@/lib/types';
 import { shortenAddress } from '@/lib/solana-utils';
-import { formatCurrency } from '@/lib/utils';
 import { LocalTag } from '@/lib/tag-store';
 
 export interface GraphNode extends Node {
