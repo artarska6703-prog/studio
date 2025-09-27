@@ -24,23 +24,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const helius = new Helius(HELIUS_API_KEY);
-    const results = await helius.rpc.getNames({ addresses });
-
     const namesAndTags: Record<
       string,
       { name: string; tags: string[] }
     > = {};
 
-    Object.keys(results).forEach((address) => {
-      namesAndTags[address] = {
-        name: results[address].name,
-        tags: results[address].tags,
-      };
-    });
+    // Helius RPC has a limit of 100 addresses per request
+    const chunkSize = 100;
+    for (let i = 0; i < addresses.length; i += chunkSize) {
+      const chunk = addresses.slice(i, i + chunkSize);
+      const results = await helius.rpc.getNames({ addresses: chunk });
+
+      Object.keys(results).forEach((address) => {
+        namesAndTags[address] = {
+          name: results[address].name,
+          tags: results[address].tags,
+        };
+      });
+    }
 
     return NextResponse.json({ namesAndTags });
   } catch (error: any) {
-    console.error(`[API NAMES] Failed to fetch names/tags:`, error);
+    console.error(`[API NAMES] Failed to fetch names/tags. Error:`, error.message);
     return NextResponse.json(
       {
         message: `Failed to fetch names and tags: ${
