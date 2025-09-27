@@ -25,9 +25,8 @@ import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
 import { useToast } from "@/hooks/use-toast";
-import { shortenAddress } from "@/lib/solana-utils";
 import { useSearchParams } from "next/navigation";
-import { getAllTags, type LocalTag } from "@/lib/tag-store";
+import type { LocalTag } from "@/lib/tag-store";
 
 const TXN_PAGE_SIZE = 100;
 
@@ -37,11 +36,11 @@ type WalletPageViewProps = {
   address: string;
 };
 
-type AddressNameAndTags = {
-  name: string;
-  tags: string[];
-  type?: string; // For local tags
+type AddressTagInfo = {
+    name: string;
+    type: string;
 };
+
 
 export function WalletPageView({ address }: WalletPageViewProps) {
   const searchParams = useSearchParams();
@@ -62,7 +61,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'portfolio');
 
   const refreshLocalTags = useCallback(() => {
-    setLocalAddressTags(getAllTags());
+    // This function is kept for onTagUpdate prop but the underlying store is changed
+    // setLocalAddressTags(getAllTags());
   }, []);
 
   useEffect(() => {

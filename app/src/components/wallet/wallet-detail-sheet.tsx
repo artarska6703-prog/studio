@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -22,11 +22,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '../ui/accordion';
-import { getTag, setTag, LocalTag } from '@/lib/tag-store';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { groupStyles } from './wallet-relationship-graph-utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface WalletDetailSheetProps {
   address: string;
@@ -54,25 +49,14 @@ const StatItem = ({
   </div>
 );
 
-const tagOptions = Object.keys(groupStyles).filter(key => key !== 'root');
-
 export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: WalletDetailSheetProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [details, setDetails] = useState<WalletDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditingTag, setIsEditingTag] = useState(false);
-  const [tagName, setTagName] = useState('');
-  const [tagType, setTagType] = useState('');
-  const [localTag, setLocalTag] = useState<LocalTag | null>(null);
 
   useEffect(() => {
     if (open && address) {
-      const currentTag = getTag(address);
-      setLocalTag(currentTag);
-      setTagName(currentTag?.name || '');
-      setTagType(currentTag?.type || '');
-
       const fetchData = async () => {
         setIsLoading(true);
         setDetails(null);
@@ -102,8 +86,6 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
         }
       };
       fetchData();
-    } else {
-        setIsEditingTag(false);
     }
   }, [address, open, toast, onOpenChange]);
 
@@ -116,22 +98,8 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
       });
   };
 
-  const handleSaveTag = () => {
-    if (!tagName && !tagType) {
-      setTag(address, null); // Remove tag if both are empty
-      toast({ title: 'Tag Removed' });
-    } else {
-      setTag(address, { name: tagName, type: tagType });
-      toast({ title: 'Tag Saved' });
-    }
-    onTagUpdate(); // Notify parent to refresh tags
-    setIsEditingTag(false);
-    const newTag = getTag(address);
-    setLocalTag(newTag);
-  };
-
-  const sheetTitle = localTag?.name || shortenAddress(address, 12);
-  const sheetDescription = localTag?.name ? `(${localTag.type}) ${shortenAddress(address, 6)}` : `A summary of this wallet's balance and token holdings.`;
+  const sheetTitle = shortenAddress(address, 12);
+  const sheetDescription = `A summary of this wallet's balance and token holdings.`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -183,43 +151,6 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
                             </span>
                         )}
                     </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-             <Accordion type="single" collapsible>
-              <AccordionItem value="tagging" className="border-b-0">
-                <AccordionTrigger className="font-semibold text-base py-2">
-                    <div className='flex items-center gap-2'>
-                        <Tag className="h-4 w-4"/> Manual Tag
-                    </div>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-4 pt-2">
-                     <div className="space-y-2">
-                        <Label htmlFor="tagName">Custom Name</Label>
-                        <Input 
-                            id="tagName"
-                            placeholder="e.g., My Burner Wallet"
-                            value={tagName}
-                            onChange={(e) => setTagName(e.target.value)}
-                        />
-                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="tagType">Category</Label>
-                        <Select value={tagType} onValueChange={setTagType}>
-                            <SelectTrigger id="tagType">
-                                <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="">None</SelectItem>
-                                {tagOptions.map(opt => (
-                                    <SelectItem key={opt} value={opt} className="capitalize">
-                                        {opt}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                     </div>
-                     <Button onClick={handleSaveTag} className="w-full">Save Tag</Button>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
