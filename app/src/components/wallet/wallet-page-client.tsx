@@ -1,4 +1,3 @@
-
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 

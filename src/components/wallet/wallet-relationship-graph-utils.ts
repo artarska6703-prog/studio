@@ -150,7 +150,7 @@ export const processTransactions = (
 
     transactions.forEach(tx => {
         const from = 'from' in tx ? tx.from : tx.feePayer;
-        const to = 'to' in tx ? tx.to : (tx.instructions && tx.instructions.length > 0) ? tx.instructions[0].programId : null;
+        const to = 'to' in tx ? tx.to : tx.instructions[0]?.programId;
         const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null) ?? 0;
 
 

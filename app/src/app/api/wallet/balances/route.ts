@@ -1,4 +1,3 @@
-
 // src/app/api/wallet/balances/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
