@@ -71,6 +71,11 @@ const getNodeType = (
     
     // 1. Prioritize local manual tags
     if (localTag && localTag.type) {
+        const type = localTag.type.toLowerCase();
+        // Check if the manual tag type matches one of our defined groups
+        if (Object.keys(groupStyles).includes(type)) {
+            return type;
+        }
         return localTag.type;
     }
     
@@ -166,7 +171,7 @@ export const processTransactions = (
         const to = tx.to;
         const value = tx.valueUSD ?? 0;
 
-        const participants = new Set([from, to].filter(Boolean) as string[]);
+        const participants = new Set([from, to, tx.feePayer].filter(Boolean) as string[]);
         
         participants.forEach(address => {
             if (!addressData[address]) {
@@ -183,11 +188,9 @@ export const processTransactions = (
             }
         });
 
-        if (from && value > 0) {
-            addressData[from].netFlow -= value;
-        }
-        if (to && value > 0) {
-            addressData[to].netFlow += value;
+        if (from && to) {
+            if (from === rootAddress) addressData[to].netFlow += value;
+            if (to === rootAddress) addressData[from].netFlow -= value;
         }
         
         if (from && to && from !== to) {
