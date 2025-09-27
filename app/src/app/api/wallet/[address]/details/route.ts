@@ -38,6 +38,7 @@ export async function GET(
           limit: 1000,
           displayOptions: {
             showFungible: true,
+            showNativeBalance: true,
           },
         },
       }),
@@ -51,13 +52,14 @@ export async function GET(
 
     const { result } = await response.json();
 
-    let solBalance = 0;
+    const solBalance = (result.nativeBalance?.lamports || 0) / LAMPORTS_PER_SOL;
+    const solPrice = result.nativeBalance?.price_per_sol || 0;
+    const solValueUSD = solBalance * solPrice;
+    
     const tokens: TokenHolding[] = [];
 
     for (const asset of result.items) {
-      if (asset.id === SOL_MINT) {
-        solBalance = asset.token_info?.balance / LAMPORTS_PER_SOL || 0;
-      } else if (asset.interface === 'FungibleToken' && asset.token_info) {
+      if (asset.interface === 'FungibleToken' && asset.token_info && asset.content?.metadata) {
         const price = asset.token_info.price_info?.price_per_token || 0;
         const amount = asset.token_info.balance / Math.pow(10, asset.token_info.decimals);
         tokens.push({
@@ -73,9 +75,6 @@ export async function GET(
         });
       }
     }
-    
-    const solPrice = result.nativeBalance?.price_per_sol || 0;
-    const solValueUSD = solBalance * solPrice;
 
     const body: WalletDetails = {
       address,
