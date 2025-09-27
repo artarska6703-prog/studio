@@ -108,11 +108,11 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
   const [physics, setPhysics] = useState<PhysicsState>({
     solver: 'barnesHut',
-    gravitationalConstant: -30000,
-    centralGravity: 0.9,
-    springLength: 70,
-    springConstant: 0.06,
-    damping: 0.09,
+    gravitationalConstant: -40000,
+    centralGravity: 0.7,
+    springLength: 120,
+    springConstant: 0.08,
+    damping: 0.1,
     avoidOverlap: 0.8,
   });
 
@@ -234,8 +234,16 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
         height: '100%',
         width: '100%',
         physics: {
-          enabled: true, // Start with physics enabled
-          ...physics
+          enabled: true,
+          solver: physics.solver,
+          barnesHut: {
+            gravitationalConstant: physics.gravitationalConstant,
+            centralGravity: physics.centralGravity,
+            springLength: physics.springLength,
+            springConstant: physics.springConstant,
+            damping: physics.damping,
+            avoidOverlap: physics.avoidOverlap,
+          },
         },
         nodes: {
             font: { size: 14, face: 'Inter', color: '#fff', strokeWidth: 3, strokeColor: '#252525' },
