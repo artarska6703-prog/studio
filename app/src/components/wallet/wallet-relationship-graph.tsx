@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
-import { Transaction, WalletDetails } from '@/lib/types';
+import { Transaction, WalletDetails, FlattenedTransaction } from '@/lib/types';
 import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles, PhysicsState, AddressTagInfo } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { LocalTag } from '@/lib/tag-store';
+import { Badge } from '../ui/badge';
 
 export type DiagnosticData = {
   nodes: GraphNode[];
@@ -30,13 +31,14 @@ export type DiagnosticData = {
 
 interface WalletNetworkGraphProps {
     walletAddress: string;
-    transactions: Transaction[];
+    transactions: FlattenedTransaction[];
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
     addressTags: Record<string, LocalTag>;
     onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
     isLoading: boolean;
     onTagUpdate: () => void;
+    enrichedTokens: any; // Add this prop
 }
 
 
@@ -87,11 +89,21 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
         <div className="text-muted-foreground">Transactions:</div>
         <div className="text-right font-mono">{node.transactionCount}</div>
       </div>
+      {node.labels && node.labels.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-border">
+              <div className="text-muted-foreground text-xs mb-1">Behavioral Tags:</div>
+              <div className="flex flex-wrap gap-1">
+                  {node.labels.map(label => (
+                      <Badge key={label} variant="secondary" className="text-xs">{label}</Badge>
+                  ))}
+              </div>
+          </div>
+      )}
     </div>
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading, onTagUpdate }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading, onTagUpdate, enrichedTokens }: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -410,8 +422,15 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
           <CustomTooltip node={tooltipData.node} position={tooltipData.position} />
         </div>
       </CardContent>
-      {selectedNodeAddress && (
-        <WalletDetailSheet address={selectedNodeAddress} open={isSheetOpen} onOpenChange={setIsSheetOpen} onTagUpdate={onTagUpdate} />
+      {selectedNodeAddress && walletDetails && (
+        <WalletDetailSheet
+            address={selectedNodeAddress}
+            open={isSheetOpen}
+            onOpenChange={setIsSheetOpen}
+            onTagUpdate={onTagUpdate}
+            details={walletDetails}
+            enrichedTokens={enrichedTokens}
+        />
       )}
     </Card>
   );

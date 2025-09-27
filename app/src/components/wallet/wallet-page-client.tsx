@@ -36,11 +36,6 @@ type WalletPageViewProps = {
   address: string;
 };
 
-type AddressTagInfo = {
-    name: string;
-    type: string;
-};
-
 
 export function WalletPageView({ address }: WalletPageViewProps) {
   const searchParams = useSearchParams();
@@ -363,6 +358,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                     addressTags={localAddressTags}
                     onTagUpdate={refreshLocalTags}
                     isLoading={isLoading}
+                    enrichedTokens={enrichedTokens}
                 />
             </TabsContent>
             <TabsContent value="graph-v2" className="mt-6">

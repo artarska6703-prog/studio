@@ -14,6 +14,7 @@ export interface GraphNode extends Node {
     type: string;
     notes: string;
     tokenBalance?: number;
+    labels?: string[]; // Added for behavioral labels
 }
 
 export interface GraphLink extends Edge {
@@ -39,6 +40,26 @@ export type AddressTagInfo = {
     name: string;
     type: string;
 };
+
+function getLabelsFromTransactions(transactions: FlattenedTransaction[]): string[] {
+  const labels = new Set<string>();
+  if (!transactions) return [];
+
+  for (const tx of transactions) {
+    const programName = (tx as any).programInfo?.name?.toLowerCase();
+
+    if (programName?.includes('magic eden')) labels.add('NFT Trader');
+    if (programName?.includes('tensor')) labels.add('NFT Trader');
+    if (programName?.includes('jupiter')) labels.add('DEX User');
+    if (programName?.includes('raydium')) labels.add('DEX User');
+    if (programName?.includes('orca')) labels.add('DEX User');
+    if (tx.events?.nft) labels.add('NFT Collector');
+    if (tx.type === 'SWAP') labels.add('DeFi User');
+    if (tx.instruction?.toLowerCase().includes('stake')) labels.add('Staker');
+  }
+
+  return Array.from(labels);
+}
 
 
 const getNodeType = (
@@ -136,26 +157,27 @@ export const processTransactions = (
         addressBalances[walletDetails.address] = walletDetails.sol.balance;
     }
 
-    const addressData: { [key: string]: { txCount: number; interactionVolume: number; netFlow: number; } } = {};
+    const addressData: { [key: string]: { txCount: number; interactionVolume: number; netFlow: number; transactions: FlattenedTransaction[] } } = {};
     const allLinks: { [key: string]: GraphLink } = {};
     const adjacencyList: { [key: string]: string[] } = {};
 
     transactions.forEach(tx => {
-        const from = 'from' in tx ? tx.from : tx.feePayer;
-        const to = 'to' in tx ? tx.to : tx.instructions[0]?.programId;
-        const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null) ?? 0;
-
+        const flatTx = tx as FlattenedTransaction;
+        const from = flatTx.from;
+        const to = flatTx.to;
+        const value = flatTx.valueUSD ?? 0;
 
         const participants = new Set([from, to].filter(Boolean) as string[]);
         
         participants.forEach(address => {
             if (!addressData[address]) {
-                addressData[address] = { txCount: 0, interactionVolume: 0, netFlow: 0 };
+                addressData[address] = { txCount: 0, interactionVolume: 0, netFlow: 0, transactions: [] };
             }
              if (!adjacencyList[address]) {
                 adjacencyList[address] = [];
             }
             addressData[address].txCount++;
+            addressData[address].transactions.push(flatTx);
             
             if (value > 0) {
                  addressData[address].interactionVolume += value;
@@ -238,7 +260,7 @@ export const processTransactions = (
     const nodes: GraphNode[] = Object.keys(addressData)
         .filter(address => visibleNodes.has(address))
         .map(address => {
-            const { txCount, netFlow } = addressData[address];
+            const { txCount, netFlow, transactions: nodeTxs } = addressData[address];
             const balance = addressBalances[address] || 0;
             const balanceUSD = solPrice ? balance * solPrice : null; 
             const tokenBalance = tokenBalances[address];
@@ -248,6 +270,7 @@ export const processTransactions = (
             let group = groupStyles[nodeType] ? nodeType : 'shrimp'; // Fallback to shrimp if type is custom
             let label = localTag?.name || shortenAddress(address, 4);
             let fixed = false;
+            const labels = getLabelsFromTransactions(nodeTxs);
 
             if (address === rootAddress) {
                 group = 'root';
@@ -287,6 +310,7 @@ export const processTransactions = (
                 color: nodeColor as any,
                 borderWidth: isSmartMoney ? 4 : 2,
                 tokenBalance: tokenBalance,
+                labels,
             };
         });
 

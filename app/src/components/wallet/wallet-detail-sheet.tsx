@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Copy, Check, ExternalLink, Loader2, Tag } from 'lucide-react';
 import { shortenAddress } from '@/lib/solana-utils';
 import { useToast } from '@/hooks/use-toast';
-import { WalletDetails } from '@/lib/types';
+import { WalletDetails, TokenHolding } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import {
@@ -24,12 +24,15 @@ import {
 } from '../ui/accordion';
 import { LocalTag, saveTag, getTag } from '@/lib/tag-store';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 interface WalletDetailSheetProps {
   address: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTagUpdate: () => void;
+  details: WalletDetails | null;
+  enrichedTokens: TokenHolding[];
 }
 
 const StatItem = ({
@@ -51,10 +54,9 @@ const StatItem = ({
   </div>
 );
 
-export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: WalletDetailSheetProps) {
+export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate, details, enrichedTokens }: WalletDetailSheetProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
-  const [details, setDetails] = useState<WalletDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [localTag, setLocalTag] = useState<LocalTag | null>(null);
   const [isEditingTag, setIsEditingTag] = useState(false);
@@ -63,43 +65,14 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
 
   useEffect(() => {
     if (open && address) {
+      setIsLoading(!details); // If details are passed, we are not loading.
       setIsEditingTag(false);
       const tag = getTag(address);
       setLocalTag(tag);
       setTagName(tag?.name || '');
       setTagType(tag?.type || '');
-
-      const fetchData = async () => {
-        setIsLoading(true);
-        setDetails(null);
-        try {
-          const detailsRes = await fetch(`/api/wallet/${address}/details`);
-
-          if (!detailsRes.ok) {
-            const errorData = await detailsRes.json();
-            throw new Error(
-              errorData.message ||
-                `Failed to fetch wallet details. Status: ${detailsRes.status}`
-            );
-          }
-
-          const detailsData = await detailsRes.json();
-          setDetails(detailsData);
-        } catch (error: any) {
-          console.error(error);
-          toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: `Could not fetch wallet details: ${error.message}`,
-          });
-          onOpenChange(false);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchData();
     }
-  }, [address, open, toast, onOpenChange]);
+  }, [address, open, details]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(address)
@@ -168,7 +141,7 @@ export function WalletDetailSheet({ address, open, onOpenChange, onTagUpdate }: 
                             <Skeleton className="h-5 w-16" />
                         ) : (
                             <span className="font-medium">
-                                ({details?.tokens.length || 0} Tokens)
+                                ({enrichedTokens.length || 0} Tokens)
                             </span>
                         )}
                     </div>
