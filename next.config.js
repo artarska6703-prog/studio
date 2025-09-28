@@ -2,9 +2,12 @@
 const nextConfig = {
   allowedDevOrigins: [
     "http://localhost:9000",
+    "http://localhost:9001",
     "https://*.cloudworkstations.dev",
     "https://*.cluster-l6vkdperq5ebaqo3qy4ksvoqom.cloudworkstations.dev",
-    "https://studio.firebase.google.com", // explicitly add this too
+    "https://studio.firebase.google.com",
+    "https://*.web.app",
+    "https://*.firebaseapp.com"
   ],
 
   async headers() {
