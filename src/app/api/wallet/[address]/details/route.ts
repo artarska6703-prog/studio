@@ -32,8 +32,9 @@ export async function GET(
     // Get SOL balance and price concurrently
     const [lamports, prices] = await Promise.all([
       connection.getBalance(pubkey).catch(e => {
-          if (String(e?.message || "").includes("could not find account")) return 0;
-          throw e;
+          // CRITICAL FIX: If account is not found or any other error, safely return 0
+          console.warn(`[API WALLET DETAILS] getBalance failed for ${address}:`, e?.message);
+          return 0;
       }),
       getTokenPrices([SOL_MINT])
     ]);
@@ -81,10 +82,8 @@ export async function GET(
     return NextResponse.json(body);
   } catch (error: any) {
     console.error(`[API WALLET DETAILS] Failed for ${params.address}:`, error);
-    if (String(error?.message || "").includes("could not find account")) {
-      const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
-      return NextResponse.json(empty);
-    }
-    return NextResponse.json({ message: `Failed to fetch wallet details: ${error?.message || "Unknown error"}` }, { status: 500 });
+    // As a fallback, return an empty wallet structure to prevent frontend crashes
+    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
+    return NextResponse.json(empty);
   }
 }
