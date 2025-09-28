@@ -1,4 +1,3 @@
-
 import { Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { FlattenedTransaction, WalletDetails } from '@/lib/types';

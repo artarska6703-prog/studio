@@ -1,13 +1,14 @@
-
 // src/app/api/wallet/[address]/transactions/route.ts
 import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
 import { getTokenPrices } from "@/lib/price-utils";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { loadTokenMap } from "@/lib/token-list";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
+const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 // This function now returns the raw enriched transactions for label processing on the client
@@ -131,7 +132,7 @@ export async function GET(
   req: Request,
   { params }: { params?: { address?: string } }
 ) {
-  if (!HELIUS_API_KEY) {
+  if (!HELIUS_API_KEY || !RPC_ENDPOINT) {
     return NextResponse.json({ error: "Server configuration error: API keys are missing." }, { status: 500 });
   }
   const address = params?.address || "";
@@ -141,20 +142,23 @@ export async function GET(
 
   try {
     const helius = new Helius(HELIUS_API_KEY);
+    const connection = new Connection(RPC_ENDPOINT, "confirmed");
+    const publicKey = new PublicKey(address);
+
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
     const limit = parseInt(searchParams.get("limit") || "100", 10);
-
-    const txs = await helius.rpc.getTransactionsByOwner({
-      ownerAddress: address,
-      limit,
-      before,
-    });
     
-    if (!txs?.length) {
+    // More reliable method: Get signatures first, then parse.
+    const sigInfo = await connection.getSignaturesForAddress(publicKey, { limit, before });
+    if (!sigInfo?.length) {
       return NextResponse.json({ transactions: [], nextCursor: null, prices: {} });
     }
 
+    const sigs = sigInfo.map(s => s.signature);
+    const parsed = await helius.parseTransactions({ transactions: sigs, source: 'MAINNET' }); // Ensure source is specified
+    const txs = Array.isArray(parsed) ? parsed as Transaction[] : [];
+    
     const tokenMap = await loadTokenMap();
 
     const mints = new Set<string>([SOL_MINT]);
@@ -168,8 +172,8 @@ export async function GET(
 
     const prices = await getTokenPrices(Array.from(mints));
 
-    const flattened = toFlattened(txs as Transaction[], address, prices, tokenMap);
-    const nextCursor = txs.length > 0 ? txs[txs.length - 1].signature : null;
+    const flattened = toFlattened(txs, address, prices, tokenMap);
+    const nextCursor = sigInfo[sigInfo.length - 1]?.signature || null;
 
     return NextResponse.json({ transactions: flattened, nextCursor, prices });
   } catch (err: any) {

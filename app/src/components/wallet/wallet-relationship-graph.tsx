@@ -428,7 +428,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
             onOpenChange={setIsSheetOpen}
             onTagUpdate={onTagUpdate}
             details={selectedNodeDetails}
-            enrichedTokens={[]}
+            enrichedTokens={selectedNodeDetails?.tokens ?? []}
         />
       )}
     </Card>
