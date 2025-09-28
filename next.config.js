@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: () => [
+  allowedDevOrigins: [
     "http://localhost:9000",
     "https://*.cloudworkstations.dev",
     "https://*.cluster-l6vkdperq5ebaqo3qy4ksvoqom.cloudworkstations.dev",
