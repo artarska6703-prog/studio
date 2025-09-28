@@ -5,6 +5,7 @@ const nextConfig = {
     "http://localhost:9001",
     "https://studio.firebase.google.com",
     "https://*.cloudworkstations.dev",
+    "https://9001-firebase-studio-1757545853465.cluster-l6vkdperq5ebaqo3qy4ksvoqom.cloudworkstations.dev",
     "https://*.web.app",
     "https://*.firebaseapp.com"
   ],
