@@ -1,22 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ Allow Firebase Studio & Cloud Workstations Preview Domains
-  allowedDevOrigins: [
-    "http://localhost:3000",
-    "http://localhost:9000",
-    "http://localhost:9001",
-    "https://studio.firebase.google.com",
-    "https://*.web.app",
-    "https://*.firebaseapp.com",
-    "https://*.cloudworkstations.dev",
-    "https://*.cluster-*.cloudworkstations.dev"
-  ],
-
   async headers() {
     return [
       {
         source: "/:path*",
         headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*",
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET, POST, PUT, DELETE, OPTIONS",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value: "Content-Type, Authorization",
+          },
           {
             key: "Permissions-Policy",
             value: "clipboard-write=*",
