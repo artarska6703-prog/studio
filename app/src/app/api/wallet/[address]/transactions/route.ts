@@ -132,6 +132,7 @@ export async function GET(
   req: Request,
   { params }: { params?: { address?: string } }
 ) {
+  console.log("API Hit", params?.address);
   if (!HELIUS_API_KEY || !RPC_ENDPOINT) {
     return NextResponse.json({ error: "Server configuration error: API keys are missing." }, { status: 500 });
   }
