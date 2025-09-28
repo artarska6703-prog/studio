@@ -44,10 +44,19 @@ const nextConfig = {
         pathname: '/**',
       },
       {
-        protocol: 'https'
-      }
-    ]
-  }
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;
