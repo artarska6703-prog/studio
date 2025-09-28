@@ -1,13 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ✅ Allow Firebase Studio & Cloud Workstations Preview Domains
   allowedDevOrigins: [
+    "http://localhost:3000",
     "http://localhost:9000",
     "http://localhost:9001",
     "https://studio.firebase.google.com",
-    "https://*.cloudworkstations.dev",
-    "https://9001-firebase-studio-1757545853465.cluster-l6vkdperq5ebaqo3qy4ksvoqom.cloudworkstations.dev",
     "https://*.web.app",
-    "https://*.firebaseapp.com"
+    "https://*.firebaseapp.com",
+    "https://*.cloudworkstations.dev",
+    "https://*.cluster-*.cloudworkstations.dev"
   ],
 
   async headers() {
@@ -27,7 +29,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-
   eslint: {
     ignoreDuringBuilds: true,
   },
