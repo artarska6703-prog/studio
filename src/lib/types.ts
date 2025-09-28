@@ -1,3 +1,5 @@
+// src/lib/types.ts
+
 export interface TokenHolding {
   mint: string;
   name: string;

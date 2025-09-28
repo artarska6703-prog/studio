@@ -1,3 +1,4 @@
+
 // src/app/api/wallet/[address]/transactions/route.ts
 import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
@@ -148,7 +149,7 @@ export async function GET(
     }
 
     const sigs = sigInfo.map(s => s.signature);
-    const parsed = await helius.parseTransactions({ transactions: sigs });
+    const parsed = await helius.parseTransactions({ transactions: sigs, source: 'MAINNET_BETA' });
     const txs = Array.isArray(parsed) ? parsed as Transaction[] : [];
 
     const tokenMap = await loadTokenMap();
@@ -173,4 +174,3 @@ export async function GET(
     return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
   }
 }
-
