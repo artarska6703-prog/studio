@@ -1,13 +1,10 @@
 
 // src/app/api/wallet/names/route.ts
 import { NextResponse } from "next/server";
-import getConfig from 'next/config';
 
-const { serverRuntimeConfig } = getConfig();
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 
 export async function POST(req: Request) {
-  const HELIUS_API_KEY = serverRuntimeConfig.HELIUS_API_KEY;
-
   if (!HELIUS_API_KEY) {
     return NextResponse.json(
       { error: "Server configuration error: HELIUS_API_KEY missing" },
