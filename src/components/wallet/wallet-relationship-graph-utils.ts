@@ -172,9 +172,11 @@ export const processTransactions = (
 
         // Calculate Net Flow
         if (from && value > 0) {
+            if (!addressData[from]) addressData[from] = { txCount: 0, interactionVolume: 0, netFlow: 0 };
             addressData[from].netFlow -= value;
         }
         if (to && value > 0) {
+            if (!addressData[to]) addressData[to] = { txCount: 0, interactionVolume: 0, netFlow: 0 };
             addressData[to].netFlow += value;
         }
         
