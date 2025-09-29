@@ -230,8 +230,8 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   }
 
   // Enriched token data with prices
-  const enrichedTokens: TokenHolding[] | undefined = useMemo(() => {
-      return walletDetails?.tokens.map(token => {
+  const enrichedTokens: TokenHolding[] = useMemo(() => {
+      return (walletDetails?.tokens || []).map(token => {
           const price = tokenPrices[token.mint] ?? 0;
           return {
               ...token,
@@ -292,7 +292,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                               balance={walletDetails.sol.balance}
                               balanceUSD={walletDetails.sol.valueUSD}
                           />
-                          <TokenTable tokens={enrichedTokens ?? []} className="md:col-span-2" />
+                          <TokenTable tokens={enrichedTokens} className="md:col-span-2" />
                         </>
                     ) : isLoading ? (
                         <>
@@ -301,12 +301,12 @@ export function WalletPageView({ address }: WalletPageViewProps) {
                         </>
                     ) : <p>No details to display.</p>}
                 </div>
-                {walletDetails ? <PortfolioCompositionChart solValue={walletDetails.sol.valueUSD} tokens={enrichedTokens ?? []} /> : <p>Loading Chart...</p>}
+                {walletDetails ? <PortfolioCompositionChart solValue={walletDetails.sol.valueUSD} tokens={enrichedTokens} /> : <p>Loading Chart...</p>}
             </TabsContent>
             <TabsContent value="transactions" className="mt-6">
                  <TransactionTable 
                     transactions={filteredTransactions} 
-                    allTokens={enrichedTokens ?? []}
+                    allTokens={enrichedTokens}
                     walletAddress={address}
                     onLoadMore={handleLoadMore}
                     hasMore={!!nextSignature}
