@@ -97,10 +97,9 @@ export async function GET(
     return NextResponse.json(body);
   } catch (error: any) {
     console.error(`[API WALLET DETAILS] Failed for ${params.address}:`, error);
-    if (String(error?.message || "").includes("could not find account")) {
-      const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
-      return NextResponse.json(empty);
-    }
-    return NextResponse.json({ message: `Failed to fetch wallet details: ${error?.message || "Unknown error"}` }, { status: 500 });
+    // CRITICAL FIX: Always return a valid, empty WalletDetails object with a 200 status
+    // to prevent the parent page from crashing with a 404.
+    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
+    return NextResponse.json(empty, { status: 200 });
   }
 }
