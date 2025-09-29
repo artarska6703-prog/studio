@@ -1,3 +1,4 @@
+
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -231,7 +232,10 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
   // Enriched token data with prices
   const enrichedTokens: TokenHolding[] = useMemo(() => {
-      return (walletDetails?.tokens || []).map(token => {
+      if (!walletDetails) {
+          return [];
+      }
+      return (walletDetails.tokens || []).map(token => {
           const price = tokenPrices[token.mint] ?? 0;
           return {
               ...token,
@@ -239,7 +243,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
               valueUSD: token.amount * price,
           }
       });
-  }, [walletDetails?.tokens, tokenPrices]);
+  }, [walletDetails, tokenPrices]);
 
   if (isLoading && !useMockData) {
       return <Loading />;
