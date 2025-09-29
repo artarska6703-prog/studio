@@ -1,4 +1,3 @@
-
 // src/app/api/wallet/names/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -22,42 +21,44 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(`https://api.helius.xyz/v0/addresses/names?api-key=${HELIUS_API_KEY}`, {
+    const response = await fetch(
+      `https://api.helius.xyz/v0/addresses/names?api-key=${HELIUS_API_KEY}`,
+      {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ addresses }),
-    });
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addresses),
+      }
+    );
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Helius API failed with status ${response.status}: ${errorData.error || 'Unknown error'}`);
+      const errorData = await response.json();
+      throw new Error(
+        `Helius API failed with status ${response.status}: ${errorData.error || 'Unknown error'}`
+      );
     }
 
-    const results = await response.json();
+    const data = await response.json();
 
+    // 🧠 Format into expected object structure:
     const namesAndTags: Record<
       string,
       { name: string; tags: string[] }
     > = {};
 
-    results.forEach((result: { address: string, name: string, tags: any[] }) => {
-        namesAndTags[result.address] = {
-            name: result.name,
-            tags: result.tags.map(t => t.tag) || []
-        };
+    data.forEach((entry: any) => {
+      const address = entry?.address;
+      const name = entry?.name || '';
+      const tags = entry?.tags || [];
+      if (address) {
+        namesAndTags[address] = { name, tags };
+      }
     });
 
     return NextResponse.json({ namesAndTags });
-  } catch (error: any) {
-    console.error(`[API NAMES] Failed to fetch names/tags:`, error);
+  } catch (error) {
+    console.error('[Helius Tag API Error]', error);
     return NextResponse.json(
-      {
-        message: `Failed to fetch names and tags: ${
-          error?.message || 'Unknown error'
-        }`,
-      },
+      { error: 'Failed to fetch wallet names and tags.', details: error },
       { status: 500 }
     );
   }
