@@ -3,8 +3,6 @@
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
-  console.log(">>>> INSIDE /api/tags REST ROUTE <<<<"); // ✅ put it here
-
   const { searchParams } = new URL(req.url);
   const wallet = searchParams.get("wallet");
 
@@ -16,6 +14,7 @@ export async function GET(req: Request) {
   }
 
   try {
+    // CORRECTED: Use the v0 addresses endpoint for tags
     const heliusRes = await fetch(
       `https://api.helius.xyz/v0/addresses/${wallet}/tags?api-key=${process.env.HELIUS_API_KEY}`
     );
