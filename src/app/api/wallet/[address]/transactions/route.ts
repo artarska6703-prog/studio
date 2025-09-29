@@ -130,7 +130,7 @@ function toFlattened(
         symbol: null,
         mint: null,
         from: tx.feePayer,
-        to: programId,
+        to: programId || null,
         by: tx.feePayer,
         instruction: tx.type,
         interactedWith: Array.from(
