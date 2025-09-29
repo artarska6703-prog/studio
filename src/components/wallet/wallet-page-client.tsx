@@ -232,10 +232,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
   // Enriched token data with prices
   const enrichedTokens: TokenHolding[] = useMemo(() => {
-      if (!walletDetails) {
-          return [];
-      }
-      return (walletDetails.tokens || []).map(token => {
+      return (walletDetails?.tokens ?? []).map(token => {
           const price = tokenPrices[token.mint] ?? 0;
           return {
               ...token,
