@@ -1,3 +1,4 @@
+
 // src/app/api/wallet/names/route.ts
 import { NextResponse } from "next/server";
 
