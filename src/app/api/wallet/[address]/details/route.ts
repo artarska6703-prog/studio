@@ -43,7 +43,7 @@ export async function GET(
     const solPrice = prices[SOL_MINT] ?? 0;
     const solValueUSD = solAmount * solPrice;
 
-    // Get Assets (tokens, NFTs, etc.) using a direct fetch call
+    // Get Assets (tokens, NFTs, etc.) using a direct fetch call to the correct RPC endpoint
     const response = await fetch(RPC_ENDPOINT, {
         method: 'POST',
         headers: {
