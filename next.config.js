@@ -1,9 +1,11 @@
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
-  // This is required to allow the Next.js dev server to be accessed from the Firebase Studio preview.
-  allowedDevOrigins: ["http://localhost:3000", "https://*.cluster-l6vkdperq5ebaqo3qy4ksvoqom.cloudworkstations.dev"],
+  experimental: {
+    allowedDevOrigins: [
+      "http://localhost:3000",
+      "https://*.cloudworkstations.dev", // wildcard to cover all Firebase Studio preview URLs
+    ],
+  },
   async headers() {
     return [
       {
@@ -16,8 +18,6 @@ const nextConfig = {
         ],
       },
     ];
-  },
-  experimental: {
   },
   typescript: {
     ignoreBuildErrors: true,

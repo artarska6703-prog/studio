@@ -4,12 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { LAMPORTS_PER_SOL, PublicKey, Connection } from "@solana/web3.js";
 import type { TokenHolding, WalletDetails } from "@/lib/types";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
+import { Helius } from "helius-sdk";
 import { getTokenPrices } from "@/lib/price-utils";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
 const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
-const HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 
 export async function GET(
   request: NextRequest,
@@ -25,6 +25,7 @@ export async function GET(
   }
 
   try {
+    const helius = new Helius(HELIUS_API_KEY);
     const connection = new Connection(RPC_ENDPOINT, "confirmed");
     const pubkey = new PublicKey(address);
 
@@ -41,33 +42,16 @@ export async function GET(
     const solPrice = prices[SOL_MINT] ?? 0;
     const solValueUSD = solAmount * solPrice;
 
-    // Get Assets (tokens, NFTs, etc.) using direct fetch
-    const assetsResponse = await fetch(HELIUS_RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 'solviz-get-assets',
-        method: 'getAssetsByOwner',
-        params: {
-          ownerAddress: address,
-          page: 1,
-          limit: 1000,
-        },
-      }),
+    // Get Assets (tokens, NFTs, etc.)
+    const assets = await helius.rpc.getAssetsByOwner({
+      ownerAddress: address,
+      page: 1,
+      limit: 1000,
     });
-    
-    if (!assetsResponse.ok) {
-        const errorData = await assetsResponse.json();
-        console.error("Helius API error response:", errorData);
-        throw new Error(`Helius RPC error: ${assetsResponse.status} ${assetsResponse.statusText}`);
-    }
-
-    const assetsData = await assetsResponse.json();
-    const assets = assetsData?.result;
-
 
     // Build tokens list (excluding SOL, which is handled separately)
+    // We will NOT fetch prices here to speed up the initial load.
+    // Prices will be supplied by the transactions endpoint later.
     const tokens: TokenHolding[] = (assets?.items ?? [])
       .filter(a => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
       .map(a => {
@@ -97,9 +81,10 @@ export async function GET(
     return NextResponse.json(body);
   } catch (error: any) {
     console.error(`[API WALLET DETAILS] Failed for ${params.address}:`, error);
-    // CRITICAL FIX: Always return a valid, empty WalletDetails object with a 200 status
-    // to prevent the parent page from crashing with a 404.
-    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
-    return NextResponse.json(empty, { status: 200 });
+    if (String(error?.message || "").includes("could not find account")) {
+      const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
+      return NextResponse.json(empty);
+    }
+    return NextResponse.json({ message: `Failed to fetch wallet details: ${error?.message || "Unknown error"}` }, { status: 500 });
   }
 }
