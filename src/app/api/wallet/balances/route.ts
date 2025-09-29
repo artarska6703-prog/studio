@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { isValidSolanaAddress } from '@/lib/solana-utils';
 
-const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
+const RPC_ENDPOINT = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 
 export async function POST(request: NextRequest) {
   if (!RPC_ENDPOINT) {
