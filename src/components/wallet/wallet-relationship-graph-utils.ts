@@ -47,7 +47,7 @@ const getNodeType = (
 ): string => {
   if (tagsAndName && tagsAndName.tags.length > 0) {
     const tags = tagsAndName.tags.map(tag => tag.toLowerCase());
-
+    
     if (tags.includes("exchange") || tags.includes("cex")) return "exchange";
     if (tags.includes("protocol") || tags.includes("dex") || tags.includes("platform")) return "platform";
     if (tags.includes("bridge")) return "bridge";
@@ -277,7 +277,6 @@ export const processTransactions = (
         fixed,
         x: fixed ? 0 : undefined,
         y: fixed ? 0 : undefined,
-        // ❌ Removed `title` so no extra white tooltip
         color: nodeColor,
         borderWidth: isSmartMoney ? 4 : 2,
         tokenBalance: tokenBalance,

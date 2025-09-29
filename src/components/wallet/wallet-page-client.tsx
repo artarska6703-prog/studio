@@ -1,3 +1,4 @@
+
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -26,9 +27,6 @@ import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams } from "next/navigation";
-
-// ✅ NEW
-import { getWalletTags } from '@/lib/getWalletTags';
 
 const TXN_PAGE_SIZE = 100;
 
@@ -86,31 +84,35 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     }
   };
 
-  // Replace your fetchAddressNames with this
-const fetchAddressNames = useCallback(async (addresses: string[]) => {
-  if (addresses.length === 0) return;
-
-  try {
-    const updates: Record<string, AddressNameAndTags> = {};
-
-    for (const addr of addresses) {
-      try {
-        const tags = await getWalletTags(addr); // fetch per-wallet
-        updates[addr] = {
-          name: addr.slice(0, 4) + "..." + addr.slice(-4), // fallback to shortened address
-          tags: tags.map(t => t.tag),
-        };
-      } catch (err) {
-        console.error(`Failed to fetch tags for ${addr}`, err);
-        updates[addr] = { name: addr.slice(0, 4) + "..." + addr.slice(-4), tags: [] };
+  const fetchAddressNames = useCallback(async (addresses: string[]) => {
+    if (addresses.length === 0) return;
+  
+    try {
+      const res = await fetch(`/api/wallet/names`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addresses }),
+      });
+  
+      if (!res.ok) {
+        throw new Error("Failed to fetch address names/tags");
       }
+  
+      const data = await res.json();
+      const updates: Record<string, AddressNameAndTags> = {};
+  
+      data.forEach((item: { address: string; name: string; tags: any[] }) => {
+        updates[item.address] = {
+          name: item.name,
+          tags: item.tags.map((t: any) => t.tag),
+        };
+      });
+  
+      setAddressTags(prev => ({ ...prev, ...updates }));
+    } catch (e) {
+      console.error("Error fetching address names from Helius", e);
     }
-
-    setAddressTags(prev => ({ ...prev, ...updates }));
-  } catch (e) {
-    console.error("Error fetching address names/tags from Helius", e);
-  }
-}, []);
+  }, []);
 
   const fetchTransactions = useCallback(async (before?: string) => {
     setIsFetchingMore(true);
