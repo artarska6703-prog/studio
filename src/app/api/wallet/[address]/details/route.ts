@@ -16,10 +16,14 @@ export async function GET(
   const { address } = params;
 
   if (!process.env.HELIUS_API_KEY) {
-    return NextResponse.json({ message: "Server configuration error: API keys are missing." }, { status: 500 });
+    console.error("[API WALLET DETAILS] Server configuration error: API keys are missing.");
+    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
+    return NextResponse.json(empty);
   }
   if (!isValidSolanaAddress(address)) {
-    return NextResponse.json({ message: "Invalid Solana address format." }, { status: 400 });
+    console.error("[API WALLET DETAILS] Invalid Solana address format:", address);
+    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
+    return NextResponse.json(empty);
   }
 
   try {
