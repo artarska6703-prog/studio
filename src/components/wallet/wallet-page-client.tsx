@@ -1,4 +1,3 @@
-
 // src/components/wallet/wallet-page-client.tsx
 "use client";
 
@@ -12,7 +11,7 @@ import Loading from '@/app/wallet/[address]/loading';
 import { TokenTable } from '@/components/wallet/token-table';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, LineChart, X } from 'lucide-react';
+import { Terminal, LineChart, X, Share } from 'lucide-react';
 import { WalletNetworkGraph } from '@/components/wallet/wallet-relationship-graph';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getBalancedTxs, getWhaleTxs, getDegenTxs } from '@/components/wallet/mock-tx-data';
@@ -26,6 +25,7 @@ import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { WalletNetworkGraphV2 } from "./wallet-relationship-graph-v2";
 import { useToast } from "@/hooks/use-toast";
+import { shortenAddress } from "@/lib/solana-utils";
 import { useSearchParams } from "next/navigation";
 
 const TXN_PAGE_SIZE = 100;
@@ -59,6 +59,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
   const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'portfolio');
 
+
   const fetchBalances = async (addresses: string[], tokenMint?: string) => {
     if (addresses.length === 0) return;
     try {
@@ -86,33 +87,23 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
   const fetchAddressNames = useCallback(async (addresses: string[]) => {
     if (addresses.length === 0) return;
-  
     try {
-      const res = await fetch(`/api/wallet/names`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/wallet/names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addresses }),
       });
-  
       if (!res.ok) {
-        throw new Error("Failed to fetch address names/tags");
+        console.error('Failed to fetch address names/tags');
+        return;
       }
-  
-      const data = await res.json();
-      const updates: Record<string, AddressNameAndTags> = {};
-  
-      data.forEach((item: { address: string; name: string; tags: any[] }) => {
-        updates[item.address] = {
-          name: item.name,
-          tags: item.tags.map((t: any) => t.tag),
-        };
-      });
-  
-      setAddressTags(prev => ({ ...prev, ...updates }));
+      const { namesAndTags } = await res.json();
+      setAddressTags((prev) => ({ ...prev, ...namesAndTags }));
     } catch (e) {
-      console.error("Error fetching address names from Helius", e);
+      console.error('Error fetching address names/tags', e);
     }
   }, []);
+
 
   const fetchTransactions = useCallback(async (before?: string) => {
     setIsFetchingMore(true);
@@ -134,6 +125,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
         setNextSignature(data.nextCursor);
 
+        // The transactions endpoint now returns prices
         if (data.prices) {
             setTokenPrices(prev => ({...prev, ...data.prices}));
         }
@@ -179,7 +171,9 @@ export function WalletPageView({ address }: WalletPageViewProps) {
             const details = await detailsRes.json();
             setWalletDetails(details);
             await fetchAddressNames([address]);
+            
             await fetchTransactions();
+
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -217,6 +211,7 @@ export function WalletPageView({ address }: WalletPageViewProps) {
 
   const filteredTransactions = useMemo(() => {
     if (!dateRange || !dateRange.from) return liveTransactions;
+    
     return liveTransactions.filter(tx => {
       if (!tx.blockTime) return false;
       const txDate = new Date(tx.blockTime * 1000);
@@ -227,12 +222,14 @@ export function WalletPageView({ address }: WalletPageViewProps) {
     });
   }, [liveTransactions, dateRange]);
 
+
   const handleLoadMore = () => {
     if (nextSignature && !isFetchingMore) {
         fetchTransactions(nextSignature);
     }
-  };
+  }
 
+  // Enriched token data with prices
   const enrichedTokens: TokenHolding[] | undefined = useMemo(() => {
       return walletDetails?.tokens.map(token => {
           const price = tokenPrices[token.mint] ?? 0;

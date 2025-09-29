@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { isValidSolanaAddress } from '@/lib/solana-utils';
 
-const RPC_ENDPOINT = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
 
 export async function POST(request: NextRequest) {
-  if (!process.env.HELIUS_API_KEY) {
+  if (!RPC_ENDPOINT) {
     return NextResponse.json({ message: 'Server configuration error: RPC endpoint is missing.' }, { status: 500 });
   }
 

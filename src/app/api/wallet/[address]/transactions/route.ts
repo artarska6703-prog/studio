@@ -1,16 +1,17 @@
+
 // src/app/api/wallet/[address]/transactions/route.ts
+import { Helius } from "helius-sdk";
 import { NextResponse } from "next/server";
 import type { FlattenedTransaction, Transaction } from "@/lib/types";
 import { getTokenPrices } from "@/lib/price-utils";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { loadTokenMap } from "@/lib/token-list";
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
+const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-/**
- * Convert raw Helius transactions into our FlattenedTransaction format
- */
 function toFlattened(
   transactions: Transaction[],
   walletAddress: string,
@@ -26,12 +27,10 @@ function toFlattened(
 
     let isInteractionAdded = false;
 
-    // Native SOL transfers
+    // Handle Native SOL Transfers
     if (tx.nativeTransfers) {
       for (const t of tx.nativeTransfers) {
-        const involved =
-          t.fromUserAccount === walletAddress ||
-          t.toUserAccount === walletAddress;
+        const involved = t.fromUserAccount === walletAddress || t.toUserAccount === walletAddress;
         if (!involved) continue;
 
         const amount = (t.amount || 0) / 1e9;
@@ -40,12 +39,8 @@ function toFlattened(
         const outgoing = t.fromUserAccount === walletAddress;
         const signedAmount = outgoing ? -amount : amount;
         const price = prices[SOL_MINT] ?? 0;
-
-        const participants = [
-          tx.feePayer,
-          t.fromUserAccount,
-          t.toUserAccount,
-        ].filter(Boolean) as string[];
+        
+        const participants = [tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean) as string[];
 
         out.push({
           ...tx,
@@ -58,70 +53,56 @@ function toFlattened(
           to: t.toUserAccount || null,
           by: tx.feePayer,
           instruction: tx.type,
-          interactedWith: Array.from(new Set(participants)).filter(
-            (a) => a !== walletAddress
-          ),
+          interactedWith: Array.from(new Set(participants)).filter(a => a !== walletAddress),
           valueUSD: Math.abs(signedAmount) * price,
         });
         isInteractionAdded = true;
       }
     }
 
-    // SPL token transfers
+    // Handle SPL Token Transfers
     if (tx.tokenTransfers) {
       for (const t of tx.tokenTransfers) {
-        const involved =
-          t.fromUserAccount === walletAddress ||
-          t.toUserAccount === walletAddress;
+        const involved = t.fromUserAccount === walletAddress || t.toUserAccount === walletAddress;
         if (!involved) continue;
-
-        const tokenAmount =
-          typeof t.tokenAmount === "number" ? t.tokenAmount : 0;
+        
+        const tokenAmount = typeof t.tokenAmount === "number" ? t.tokenAmount : 0;
         if (!tokenAmount) continue;
 
-        if (!t.mint) continue;
+        // CRITICAL FIX: Ensure mint exists before processing
+        const mint = t.mint;
+        if (!mint) continue;
 
         const outgoing = t.fromUserAccount === walletAddress;
         const signedTokenAmount = outgoing ? -tokenAmount : tokenAmount;
-        const price = prices[t.mint] ?? 0;
-        const symbol =
-          tokenMap.get(t.mint) || t.mint.slice(0, 4) + "...";
-        const participants = [
-          tx.feePayer,
-          t.fromUserAccount,
-          t.toUserAccount,
-        ].filter(Boolean) as string[];
+        const price = prices[mint] ?? 0;
+        const symbol = tokenMap.get(mint) || (mint.slice(0, 4) + '...');
+        const participants = [tx.feePayer, t.fromUserAccount, t.toUserAccount].filter(Boolean) as string[];
 
         out.push({
           ...tx,
           blockTime,
           type: signedTokenAmount > 0 ? "received" : "sent",
-          amount: 0,
+          amount: 0, // SOL amount is 0 for SPL transfer-focused entry
           symbol: null,
           mint: null,
           from: t.fromUserAccount || null,
           to: t.toUserAccount || null,
           by: tx.feePayer,
           instruction: tx.type,
-          interactedWith: Array.from(
-            new Set(participants)
-          ).filter((a) => a !== walletAddress),
+          interactedWith: Array.from(new Set(participants)).filter(a => a !== walletAddress),
           valueUSD: Math.abs(signedTokenAmount) * price,
           tokenAmount: signedTokenAmount,
           tokenSymbol: symbol,
-          tokenMint: t.mint,
+          tokenMint: mint,
         });
         isInteractionAdded = true;
       }
     }
 
-    // General program interactions (if no transfers)
+    // Handle general program interactions if no specific transfer involved the wallet
     if (!isInteractionAdded && tx.feePayer === walletAddress) {
-      const programId =
-        tx.instructions && tx.instructions.length > 0
-          ? tx.instructions[0].programId
-          : null;
-
+      const programId = (tx.instructions && tx.instructions.length > 0) ? tx.instructions[0].programId : null;
       out.push({
         ...tx,
         blockTime,
@@ -130,64 +111,46 @@ function toFlattened(
         symbol: null,
         mint: null,
         from: tx.feePayer,
-        to: programId || null,
+        to: programId,
         by: tx.feePayer,
         instruction: tx.type,
-        interactedWith: Array.from(
-          new Set(
-            tx.instructions?.map((i) => i.programId).filter(Boolean) as string[]
-          )
-        ),
+        interactedWith: Array.from(new Set(tx.instructions?.map(i => i.programId).filter(Boolean) as string[])),
         valueUSD: 0,
       });
     }
   }
-
   return out;
 }
 
-/**
- * API handler
- */
 export async function GET(
   req: Request,
   { params }: { params?: { address?: string } }
 ) {
-  if (!HELIUS_API_KEY) {
-    return NextResponse.json(
-      { error: "Server configuration error: HELIUS_API_KEY missing" },
-      { status: 500 }
-    );
+  if (!HELIUS_API_KEY || !RPC_ENDPOINT) {
+    return NextResponse.json({ error: "Server configuration error: API keys are missing." }, { status: 500 });
   }
-
   const address = params?.address || "";
   if (!isValidSolanaAddress(address)) {
-    return NextResponse.json(
-      { error: "A valid wallet address must be provided." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "A valid wallet address must be provided." }, { status: 400 });
   }
 
   try {
+    const helius = new Helius(HELIUS_API_KEY);
+    const connection = new Connection(RPC_ENDPOINT, "confirmed");
+    const publicKey = new PublicKey(address);
+
     const { searchParams } = new URL(req.url);
     const before = searchParams.get("before") || undefined;
     const limit = parseInt(searchParams.get("limit") || "100", 10);
 
-    const heliusRes = await fetch(
-      `https://api.helius.xyz/v0/addresses/${address}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}${
-        before ? `&before=${before}` : ""
-      }`
-    );
-
-    if (!heliusRes.ok) {
-      const errorData = await heliusRes.json();
-      return NextResponse.json(
-        { error: "Helius API error", details: errorData },
-        { status: heliusRes.status }
-      );
+    const sigInfo = await connection.getSignaturesForAddress(publicKey, { limit, before });
+    if (!sigInfo?.length) {
+      return NextResponse.json({ transactions: [], nextCursor: null, prices: {} });
     }
 
-    const txs = (await heliusRes.json()) as Transaction[];
+    const sigs = sigInfo.map(s => s.signature);
+    const parsed = await helius.parseTransactions({ transactions: sigs });
+    const txs = Array.isArray(parsed) ? parsed as Transaction[] : [];
 
     const tokenMap = await loadTokenMap();
 
@@ -201,17 +164,13 @@ export async function GET(
     }
 
     const prices = await getTokenPrices(Array.from(mints));
-    const flattened = toFlattened(txs, address, prices, tokenMap);
 
-    const nextCursor =
-      txs.length > 0 ? txs[txs.length - 1]?.signature || null : null;
+    const flattened = toFlattened(txs, address, prices, tokenMap);
+    const nextCursor = sigInfo[sigInfo.length - 1]?.signature || null;
 
     return NextResponse.json({ transactions: flattened, nextCursor, prices });
   } catch (err: any) {
     console.error("[transactions] error:", err);
-    return NextResponse.json(
-      { error: err?.message || "Unknown error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
   }
 }

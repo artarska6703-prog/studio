@@ -6,8 +6,10 @@ import type { TokenHolding, WalletDetails } from "@/lib/types";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
 import { getTokenPrices } from "@/lib/price-utils";
 
-const RPC_ENDPOINT = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
+const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
+const HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 
 export async function GET(
   request: NextRequest,
@@ -15,15 +17,11 @@ export async function GET(
 ) {
   const { address } = params;
 
-  if (!process.env.HELIUS_API_KEY) {
-    console.error("[API WALLET DETAILS] Server configuration error: API keys are missing.");
-    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
-    return NextResponse.json(empty);
+  if (!HELIUS_API_KEY || !RPC_ENDPOINT) {
+    return NextResponse.json({ message: "Server configuration error: API keys are missing." }, { status: 500 });
   }
   if (!isValidSolanaAddress(address)) {
-    console.error("[API WALLET DETAILS] Invalid Solana address format:", address);
-    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
-    return NextResponse.json(empty);
+    return NextResponse.json({ message: "Invalid Solana address format." }, { status: 400 });
   }
 
   try {
@@ -33,8 +31,8 @@ export async function GET(
     // Get SOL balance and price concurrently
     const [lamports, prices] = await Promise.all([
       connection.getBalance(pubkey).catch(e => {
-          console.warn(`[API WALLET DETAILS] getBalance failed for ${address}:`, e?.message);
-          return 0;
+          if (String(e?.message || "").includes("could not find account")) return 0;
+          throw e;
       }),
       getTokenPrices([SOL_MINT])
     ]);
@@ -43,37 +41,40 @@ export async function GET(
     const solPrice = prices[SOL_MINT] ?? 0;
     const solValueUSD = solAmount * solPrice;
 
-    // Get Assets (tokens, NFTs, etc.) using a direct fetch call to the correct RPC endpoint
-    const response = await fetch(RPC_ENDPOINT, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
+    // Get Assets (tokens, NFTs, etc.) using direct fetch
+    const assetsResponse = await fetch(HELIUS_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'solviz-get-assets',
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: address,
+          page: 1,
+          limit: 1000,
         },
-        body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 'my-id',
-            method: 'getAssetsByOwner',
-            params: {
-                ownerAddress: address,
-                page: 1,
-                limit: 1000,
-            },
-        }),
+      }),
     });
     
-    if (!response.ok) {
-        throw new Error(`Helius RPC error: ${response.status} ${response.statusText}`);
+    if (!assetsResponse.ok) {
+        const errorData = await assetsResponse.json();
+        console.error("Helius API error response:", errorData);
+        throw new Error(`Helius RPC error: ${assetsResponse.status} ${assetsResponse.statusText}`);
     }
-    
-    const { result: assets } = await response.json();
+
+    const assetsData = await assetsResponse.json();
+    const assets = assetsData?.result;
+
 
     // Build tokens list (excluding SOL, which is handled separately)
     const tokens: TokenHolding[] = (assets?.items ?? [])
-      .filter((a: any) => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
-      .map((a: any) => {
+      .filter(a => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
+      .map(a => {
         const decimals = a.token_info?.decimals ?? 0;
         const raw = a.token_info?.balance ?? 0;
         const amount = raw / Math.pow(10, decimals);
+        // Price and valueUSD will be calculated on the client after this fetch.
         return {
           mint: a.id,
           name: a.content?.metadata?.name || "Unknown Token",
@@ -96,7 +97,10 @@ export async function GET(
     return NextResponse.json(body);
   } catch (error: any) {
     console.error(`[API WALLET DETAILS] Failed for ${params.address}:`, error);
-    const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
-    return NextResponse.json(empty);
+    if (String(error?.message || "").includes("could not find account")) {
+      const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
+      return NextResponse.json(empty);
+    }
+    return NextResponse.json({ message: `Failed to fetch wallet details: ${error?.message || "Unknown error"}` }, { status: 500 });
   }
 }
