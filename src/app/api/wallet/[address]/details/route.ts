@@ -4,11 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { LAMPORTS_PER_SOL, PublicKey, Connection } from "@solana/web3.js";
 import type { TokenHolding, WalletDetails } from "@/lib/types";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
-import { Helius } from "helius-sdk";
 import { getTokenPrices } from "@/lib/price-utils";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
-const RPC_ENDPOINT = process.env.SYNDICA_RPC_URL!;
+const RPC_ENDPOINT = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export async function GET(
@@ -25,14 +24,12 @@ export async function GET(
   }
 
   try {
-    const helius = new Helius(HELIUS_API_KEY);
     const connection = new Connection(RPC_ENDPOINT, "confirmed");
     const pubkey = new PublicKey(address);
 
     // Get SOL balance and price concurrently
     const [lamports, prices] = await Promise.all([
       connection.getBalance(pubkey).catch(e => {
-          // CRITICAL FIX: If account is not found or any other error, safely return 0
           console.warn(`[API WALLET DETAILS] getBalance failed for ${address}:`, e?.message);
           return 0;
       }),
@@ -43,23 +40,37 @@ export async function GET(
     const solPrice = prices[SOL_MINT] ?? 0;
     const solValueUSD = solAmount * solPrice;
 
-    // Get Assets (tokens, NFTs, etc.)
-    const assets = await helius.rpc.getAssetsByOwner({
-      ownerAddress: address,
-      page: 1,
-      limit: 1000,
+    // Get Assets (tokens, NFTs, etc.) using a direct fetch call
+    const response = await fetch(RPC_ENDPOINT, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'my-id',
+            method: 'getAssetsByOwner',
+            params: {
+                ownerAddress: address,
+                page: 1,
+                limit: 1000,
+            },
+        }),
     });
+    
+    if (!response.ok) {
+        throw new Error(`Helius RPC error: ${response.status} ${response.statusText}`);
+    }
+    
+    const { result: assets } = await response.json();
 
     // Build tokens list (excluding SOL, which is handled separately)
-    // We will NOT fetch prices here to speed up the initial load.
-    // Prices will be supplied by the transactions endpoint later.
     const tokens: TokenHolding[] = (assets?.items ?? [])
-      .filter(a => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
-      .map(a => {
+      .filter((a: any) => a.interface === "FungibleToken" && a.token_info?.balance && a.id !== SOL_MINT)
+      .map((a: any) => {
         const decimals = a.token_info?.decimals ?? 0;
         const raw = a.token_info?.balance ?? 0;
         const amount = raw / Math.pow(10, decimals);
-        // Price and valueUSD will be calculated on the client after this fetch.
         return {
           mint: a.id,
           name: a.content?.metadata?.name || "Unknown Token",
@@ -82,7 +93,6 @@ export async function GET(
     return NextResponse.json(body);
   } catch (error: any) {
     console.error(`[API WALLET DETAILS] Failed for ${params.address}:`, error);
-    // As a fallback, return an empty wallet structure to prevent frontend crashes
     const empty: WalletDetails = { address: params.address, sol: { balance: 0, price: 0, valueUSD: 0 }, tokens: [] };
     return NextResponse.json(empty);
   }
