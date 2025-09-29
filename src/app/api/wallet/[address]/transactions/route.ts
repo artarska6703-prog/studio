@@ -173,7 +173,6 @@ export async function GET(
     const before = searchParams.get("before") || undefined;
     const limit = parseInt(searchParams.get("limit") || "100", 10);
 
-    // ✅ REST endpoint (not SDK, no JSON-RPC)
     const heliusRes = await fetch(
       `https://api.helius.xyz/v0/addresses/${address}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}${
         before ? `&before=${before}` : ""
