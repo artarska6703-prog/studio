@@ -144,7 +144,7 @@ export async function GET(
     const limit = parseInt(searchParams.get("limit") || "100", 10);
 
     const sigInfo = await connection.getSignaturesForAddress(publicKey, { limit, before });
-    if (!sigInfo?.length) {
+    if (!sigInfo || sigInfo.length === 0) {
       return NextResponse.json({ transactions: [], nextCursor: null, prices: {} });
     }
 
