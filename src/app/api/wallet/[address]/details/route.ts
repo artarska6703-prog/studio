@@ -5,8 +5,10 @@ import { LAMPORTS_PER_SOL, PublicKey, Connection } from "@solana/web3.js";
 import type { TokenHolding, WalletDetails } from "@/lib/types";
 import { isValidSolanaAddress } from "@/lib/solana-utils";
 import { getTokenPrices } from "@/lib/price-utils";
+import getConfig from 'next/config';
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
+const { serverRuntimeConfig } = getConfig();
+const HELIUS_API_KEY = serverRuntimeConfig.HELIUS_API_KEY;
 const RPC_ENDPOINT = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 

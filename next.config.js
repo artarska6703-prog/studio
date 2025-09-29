@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverRuntimeConfig: {
+    // Will only be available on the server side
+    HELIUS_API_KEY: process.env.HELIUS_API_KEY,
+  },
   // ✅ Allow Firebase Studio & Cloud Workstations Preview Domains
   allowedDevOrigins: [
     "http://localhost:3000",

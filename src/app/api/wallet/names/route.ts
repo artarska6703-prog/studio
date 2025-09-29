@@ -1,8 +1,20 @@
 
 // src/app/api/wallet/names/route.ts
 import { NextResponse } from "next/server";
+import getConfig from 'next/config';
+
+const { serverRuntimeConfig } = getConfig();
 
 export async function POST(req: Request) {
+  const HELIUS_API_KEY = serverRuntimeConfig.HELIUS_API_KEY;
+
+  if (!HELIUS_API_KEY) {
+    return NextResponse.json(
+      { error: "Server configuration error: HELIUS_API_KEY missing" },
+      { status: 500 }
+    );
+  }
+
   try {
     const { addresses } = await req.json();
 
@@ -14,7 +26,7 @@ export async function POST(req: Request) {
     }
 
     const heliusRes = await fetch(
-      `https://api.helius.xyz/v0/addresses/names?api-key=${process.env.HELIUS_API_KEY}`,
+      `https://api.helius.xyz/v0/addresses/names?api-key=${HELIUS_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,4 +51,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
