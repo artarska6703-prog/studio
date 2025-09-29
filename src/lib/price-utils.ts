@@ -1,3 +1,4 @@
+
 // src/lib/price-utils.ts
 import { loadTokenMap } from "./token-list";
 
@@ -42,8 +43,7 @@ export async function getTokenPrices(mints: string[]): Promise<Record<string, nu
   const out: Record<string, number> = {};
   for (const mint of uniqueMints) {
      if (mint === SOL_MINT) continue;
-    const sym = mintToSymbol[mint];
-    const p = sym && data?.[sym]?.price;
+    const p = data[mint]?.price;
     out[mint] = typeof p === "number" ? p : 0;
   }
 
