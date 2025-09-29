@@ -1,6 +1,5 @@
 
 // src/app/api/wallet/names/route.ts
-import { Helius } from 'helius-sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
@@ -23,19 +22,31 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const helius = new Helius(HELIUS_API_KEY);
-    const results = await helius.rpc.getNames({ addresses });
+    const response = await fetch(`https://api.helius.xyz/v0/addresses/names?api-key=${HELIUS_API_KEY}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ addresses }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Helius API failed with status ${response.status}: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const results = await response.json();
 
     const namesAndTags: Record<
       string,
       { name: string; tags: string[] }
     > = {};
 
-    Object.keys(results).forEach((address) => {
-      namesAndTags[address] = {
-        name: results[address].name,
-        tags: results[address].tags,
-      };
+    results.forEach((result: { address: string, name: string, tags: any[] }) => {
+        namesAndTags[result.address] = {
+            name: result.name,
+            tags: result.tags.map(t => t.tag) || []
+        };
     });
 
     return NextResponse.json({ namesAndTags });
