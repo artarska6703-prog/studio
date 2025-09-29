@@ -1,4 +1,3 @@
-
 // src/app/api/tags/route.ts
 import { NextResponse } from "next/server";
 
@@ -14,7 +13,6 @@ export async function GET(req: Request) {
   }
 
   try {
-    // CORRECTED: Use the v0 addresses endpoint for tags
     const heliusRes = await fetch(
       `https://api.helius.xyz/v0/addresses/${wallet}/tags?api-key=${process.env.HELIUS_API_KEY}`
     );
@@ -29,14 +27,13 @@ export async function GET(req: Request) {
 
     const heliusData = await heliusRes.json();
 
-    // Helius returns { address, tags: [...] }
     return NextResponse.json({
       wallet,
       tags: heliusData?.tags || [],
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: "Unexpected server error.", details: err.message },
+      { error: "Unexpected server error", details: err.message },
       { status: 500 }
     );
   }

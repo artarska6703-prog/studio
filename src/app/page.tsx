@@ -3,6 +3,8 @@ import WalletSearch from "@/components/wallet/wallet-search";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { List } from "lucide-react";
 
+export const revalidate = 0;
+
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
