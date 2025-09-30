@@ -1,13 +1,13 @@
 // src/app/api/wallet/names/route.ts
-import { Helius } from 'helius-sdk';
-import { NextRequest, NextResponse } from 'next/server';
+import { Helius } from "helius-sdk";
+import { NextRequest, NextResponse } from "next/server";
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY!;
 
 export async function POST(request: NextRequest) {
   if (!HELIUS_API_KEY) {
     return NextResponse.json(
-      { message: 'Server configuration error: Helius API key is missing.' },
+      { message: "Server configuration error: Helius API key is missing." },
       { status: 500 }
     );
   }
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   if (!Array.isArray(addresses) || addresses.length === 0) {
     return NextResponse.json(
-      { message: 'An array of addresses must be provided.' },
+      { message: "An array of addresses must be provided." },
       { status: 400 }
     );
   }
@@ -25,15 +25,12 @@ export async function POST(request: NextRequest) {
     const helius = new Helius(HELIUS_API_KEY);
     const results = await helius.rpc.getNames({ addresses });
 
-    const namesAndTags: Record<
-      string,
-      { name: string; tags: string[] }
-    > = {};
+    const namesAndTags: Record<string, { name: string; tags: string[] }> = {};
 
     Object.keys(results).forEach((address) => {
       namesAndTags[address] = {
-        name: results[address].name,
-        tags: results[address].tags,
+        name: results[address]?.name || "",
+        tags: results[address]?.tags || [],
       };
     });
 
@@ -43,7 +40,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message: `Failed to fetch names and tags: ${
-          error?.message || 'Unknown error'
+          error?.message || "Unknown error"
         }`,
       },
       { status: 500 }

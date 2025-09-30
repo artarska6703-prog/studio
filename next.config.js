@@ -1,11 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    allowedDevOrigins: [
-      "http://localhost:3000",
-      "https://*.cloudworkstations.dev", // wildcard to cover all Firebase Studio preview URLs
-    ],
-  },
   async headers() {
     return [
       {
@@ -30,25 +24,21 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'placehold.co',
-        port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
-        port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'picsum.photos',
-        port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'raw.githubusercontent.com',
-        port: '',
         pathname: '/**',
       },
     ],

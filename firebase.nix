@@ -2,28 +2,26 @@
   # Which nixpkgs channel to use.
   channel = "stable-24.11"; # or "unstable"
 
-  # Use https://search.nixos.org/packages to find packages
+  # Packages available in your workspace
   packages = [
     pkgs.nodejs_20
     pkgs.zulu
   ];
 
-  # Sets environment variables in the workspace
-  env = {};
+  # Environment variables
+  env = {
+    NODE_ENV = "production"; # ✅ force prod mode for Next.js
+  };
 
-  # This adds a file watcher to startup the firebase emulators.
-  # The emulators will only start if a firebase.json file is written into the user's directory
   services.firebase.emulators = {
-    # Disabling because we are using prod backends right now
     detect = false;
     projectId = "demo-app";
     services = ["auth" "firestore"];
   };
 
   idx = {
-    # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
     extensions = [
-      # "vscodevim.vim"
+      # Add VSCode extensions here if needed
     ];
 
     workspace = {
@@ -34,13 +32,16 @@
       };
     };
 
-    # Enable previews and customize configuration
     previews = {
       enable = true;
       previews = {
         web = {
-          # ✅ Build first, then run Next.js in production SSR mode
-          command = ["sh" "-c" "npm run build && npm run start -- --port $PORT --hostname 0.0.0.0"];
+          # ✅ Build first, then run Next.js in prod SSR mode
+          command = [
+            "sh"
+            "-c"
+            "npm run build && npm run start -- -p $PORT -H 0.0.0.0"
+          ];
           manager = "web";
         };
       };
