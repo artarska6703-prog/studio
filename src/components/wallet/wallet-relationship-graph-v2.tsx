@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -9,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
-import { Transaction, WalletDetails, FlattenedTransaction } from '@/lib/types';
+import { FlattenedTransaction, WalletDetails } from '@/lib/types';
 import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles, PhysicsState } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
@@ -385,13 +383,14 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
         }
     });
 
-    networkInstance.on('hoverNode', ({ node, event }) => {
-      const foundNode = nodesDataSetRef.current.get(node);
-      if (foundNode && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setTooltipData({ node: foundNode, position: { x: event.clientX - rect.left + 15, y: event.clientY - rect.top + 15 } });
-      }
-    });
+   networkInstance.on('hoverNode', ({ node, event }) => {
+  const result = nodesDataSetRef.current.get(node);
+  const foundNode = Array.isArray(result) ? result[0] : result;
+  if (foundNode && containerRef.current) {
+    const rect = containerRef.current.getBoundingClientRect();
+    setTooltipData({ node: foundNode as GraphNode, position: { x: event.clientX - rect.left + 15, y: event.clientY - rect.top + 15 } });
+  }
+});
 
     networkInstance.on('blurNode', () => setTooltipData({ node: null, position: null }));
     networkInstance.on('dragStart', () => setTooltipData({ node: null, position: null }));
@@ -491,5 +490,3 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     </Card>
   );
 }
-
-    

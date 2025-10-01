@@ -1,4 +1,3 @@
-
 import type { TokenHolding } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -70,7 +69,6 @@ export function TokenTable({ tokens, className }: TokenTableProps) {
                     {token.amount.toLocaleString('en-US', { maximumFractionDigits: 4, })}
                   </TableCell>
                    <TableCell className="text-right font-code">
-                    {console.log("Token valueUSD raw:", token.valueUSD, "for mint", token.mint)}
                     {formatCurrency(token.valueUSD)}
                   </TableCell>
                 </TableRow>

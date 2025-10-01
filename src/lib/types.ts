@@ -69,3 +69,8 @@ export interface FlattenedTransaction {
   tokenSymbol?: string | null;
   tokenMint?: string | null;
 }
+
+export interface AddressNameAndTags {
+  name: string;
+  tags: string[];
+}

@@ -1,16 +1,12 @@
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 
-runtime: nodejs20
-entrypoint: npm run start
-
-build:
-  command: npm run build
-
 runConfig:
+  # Increase this value if you'd like to automatically spin up
+  # more instances in response to increased traffic.
   maxInstances: 1
+  # Allow server actions up to 2 minutes to complete.
   timeoutSeconds: 120
-
 rateLimits:
   requestsPerSecond: 15
   requestsPerDay: 50000

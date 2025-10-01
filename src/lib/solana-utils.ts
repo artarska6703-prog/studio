@@ -6,7 +6,7 @@ import { PublicKey } from '@solana/web3.js';
  * @returns True if the address is a valid Solana public key, false otherwise.
  */
 export function isValidSolanaAddress(address: string): boolean {
-  if (!address) {
+  if (!address || typeof address !== 'string' || address.length < 32 || address.length > 44) {
     return false;
   }
   try {
@@ -26,7 +26,6 @@ export function isValidSolanaAddress(address: string): boolean {
  */
 export function shortenAddress(address: string, chars = 4): string {
   if (!isValidSolanaAddress(address)) {
-    // If the address is invalid, return it as-is without trying to shorten.
     return address;
   }
   return `${address.substring(0, chars)}...${address.substring(address.length - chars)}`;

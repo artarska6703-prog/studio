@@ -1,17 +1,14 @@
-
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import type { TokenHolding, FlattenedTransaction } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { shortenAddress } from '@/lib/solana-utils';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { formatDistanceToNow, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { Copy, Check, Filter, Download, MoreHorizontal, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { Copy, Check, Download, MoreHorizontal, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -25,19 +22,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
 import { AddressFilter, AddressFilterPopover } from './address-filter-popover';
 
-// Fallback copy function for restrictive environments
 async function copyToClipboard(text: string): Promise<boolean> {
     try {
-        // First, try the modern Clipboard API
         await navigator.clipboard.writeText(text);
         return true;
     } catch (err) {
-        // If that fails, fall back to the legacy execCommand
         console.warn("Clipboard API failed, falling back to execCommand.", err);
         const textArea = document.createElement("textarea");
         textArea.value = text;
-        
-        // Make the textarea invisible
         textArea.style.position = "fixed"; 
         textArea.style.top = "0";
         textArea.style.left = "0";
@@ -64,7 +56,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
         }
     }
 }
-
 
 const AddressDisplay = ({ address }: { address: string | null }) => {
     const [copied, setCopied] = useState(false);
@@ -118,7 +109,6 @@ const getActionBadge = (instruction: string) => {
     if (action === 'CREATE ACCOUNT') variant = 'secondary';
     if (action === 'SWAP') variant = 'secondary';
 
-
     return <Badge variant={variant} className="capitalize py-1">{action.toLowerCase()}</Badge>
 }
 
@@ -171,7 +161,6 @@ interface TransactionTableProps {
   useMockData: boolean;
 }
 
-
 export function TransactionTable({ 
     transactions, 
     allTokens, 
@@ -209,7 +198,6 @@ export function TransactionTable({
     return map;
   }, [allTokens]);
 
-
   const filteredTransactions = useMemo(() => {
     const minValue = parseFloat(debouncedMinValue);
     const validMinValue = isNaN(minValue) ? 0 : minValue;
@@ -228,7 +216,6 @@ export function TransactionTable({
                                 (directionFilter === 'in' && (tx.to === walletAddress || (tx.type === 'program_interaction' && tx.interactedWith.includes(walletAddress) && tx.amount > 0))) ||
                                 (directionFilter === 'out' && (tx.from === walletAddress)) ||
                                 (directionFilter === 'program' && tx.type === 'program_interaction');
-
         
         const dateMatch = !dateRange?.from || 
                           (tx.blockTime ? isWithinInterval(new Date(tx.blockTime * 1000), { 
@@ -297,8 +284,7 @@ export function TransactionTable({
     });
     
     return formatter.format(absAmount);
-};
-
+  };
 
   return (
     <Card>
@@ -369,7 +355,6 @@ export function TransactionTable({
             <TableBody>
               {paginatedTransactions.length > 0 ? paginatedTransactions.map((tx, idx) => {
                 const isOut = (tx.from === walletAddress) || (tx.type === 'program_interaction' && tx.tokenAmount !== undefined && tx.tokenAmount < 0);
-                const amount = tx.tokenAmount ?? tx.amount;
                 return (
                 <TableRow key={`${tx.signature}-${idx}`}>
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
@@ -388,7 +373,6 @@ export function TransactionTable({
                         {tx.type !== 'program_interaction' || tx.tokenAmount ? (isOut ? '-' : '+') : ''}{formatAmount(tx)}
                     </TableCell>
                     <TableCell className="text-right font-code text-muted-foreground">
-                        {console.log("Tx valueUSD raw:", tx.valueUSD, "for signature", tx.signature)}
                         {formatCurrency(Math.abs(tx.valueUSD))}
                     </TableCell>
                     <TableCell className="text-right font-code font-bold">
@@ -416,72 +400,41 @@ export function TransactionTable({
             </div>
         )}
       </CardContent>
-
-        <div className="flex items-center justify-between p-4 border-t">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Show</span>
-                <Select value={String(rowsPerPage)} onValueChange={handleRowsPerPageChange}>
-                    <SelectTrigger className="w-20 h-8">
-                        <SelectValue placeholder="Rows" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="25">25</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                    </SelectContent>
-                </Select>
-                <span>per page</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                    Page {page} of {totalPages > 0 ? totalPages : 1}
-                </span>
-                <div className="flex items-center gap-1">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setPage(1)}
-                        disabled={page === 1}
-                    >
-                        <span className="sr-only">First page</span>
-                        <ChevronsLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                    >
-                       <span className="sr-only">Previous page</span>
-                       <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                     <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages || totalPages === 0}
-                    >
-                        <span className="sr-only">Next page</span>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setPage(totalPages)}
-                        disabled={page === totalPages || totalPages === 0}
-                    >
-                        <span className="sr-only">Last page</span>
-                        <ChevronsRight className="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
+      <div className="flex items-center justify-between p-4 border-t">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Show</span>
+              <Select value={String(rowsPerPage)} onValueChange={handleRowsPerPageChange}>
+                  <SelectTrigger className="w-20 h-8">
+                      <SelectValue placeholder="Rows" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+              </Select>
+              <span>per page</span>
+          </div>
+          <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(1)} disabled={page === 1}>
+                      <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                     <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                   <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                      <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(totalPages)} disabled={page === totalPages}>
+                      <ChevronsRight className="h-4 w-4" />
+                  </Button>
+              </div>
+          </div>
       </div>
-
     </Card>
   );
 }
