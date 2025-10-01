@@ -1,10 +1,9 @@
-
-
 import { Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Transaction, FlattenedTransaction, WalletDetails, AddressNameAndTags } from '@/lib/types';
 import { shortenAddress } from '@/lib/solana-utils';
 import { formatCurrency } from '@/lib/utils';
+import { knownAddresses } from '@/lib/knownAddresses';
 
 export interface GraphNode extends Node {
     id: string;
@@ -41,26 +40,43 @@ const getNodeType = (
     balance: number, 
     balanceUSD: number | null, 
     tagsAndName?: AddressNameAndTags
-    ): string => {
-    
-    // 1. Prioritize Helius tags and names
-    if (tagsAndName) {
-        const { name, tags } = tagsAndName;
-        const lowerName = name?.toLowerCase() || '';
-
-        if (tags.includes('protocol') || tags.includes('dex')) return 'platform';
-        if (tags.includes('exchange') || tags.includes('cex')) return 'exchange';
-        if (tags.includes('bridge')) return 'bridge';
-
-        if (lowerName.includes('pump.fun')) return 'platform';
+): string => {
+    // 0. Check static known addresses first
+    if (knownAddresses[address]) {
+        return knownAddresses[address];
     }
-    
-    // 2. Fallback to keyword matching on address if no tags
+
+    const tags = tagsAndName?.tags || [];
+    const lowerName = tagsAndName?.name?.toLowerCase() || "";
+
+    // 1. Prioritize tags from Solscan / Dune
+    if (tags.includes("exchange")) return "exchange";
+    if (tags.includes("platform") || tags.includes("dex") || tags.includes("protocol")) return "platform";
+    if (tags.includes("bridge")) return "bridge";
+    if (tags.includes("dao")) return "dao";
+    if (tags.includes("nft") || tags.includes("nft_project")) return "nft";
+
+    // 2. Heuristic: detect Pump.fun or similar in name
+    if (lowerName.includes("pumpfun") || lowerName.includes("pump.fun")) return "platform";
+
+    // 3. Fallback keyword heuristics (from address string)
     const lowerAddress = address.toLowerCase();
     const keywords = {
-        exchange: ['binance', 'coinbase', 'kraken', 'ftx', 'kucoin'],
-        platform: ['jupiter', 'raydium', 'orca', 'pump', 'marinade', 'tensor', 'magiceden'],
-        bridge: ['wormhole', 'portal']
+        exchange: [
+            "binance", "coinbase", "kraken", "ftx", "kucoin",
+            "bybit", "okx", "gate", "huobi", "gemini", "bitfinex"
+        ],
+        platform: [
+            "jupiter", "raydium", "orca", "meteora", "lifinity", "phoenix",
+            "drift", "mango", "solend", "kamino", "marginfi", "port",
+            "magiceden", "tensor", "opensea", "blur", "solanart",
+            "pump", "moonshot",
+            "marinade", "lido", "jito", "sanctum",
+            "phantom", "backpack"
+        ],
+        bridge: [
+            "wormhole", "portal", "allbridge", "synapse", "celer", "mayan"
+        ]
     };
 
     for (const [type, keys] of Object.entries(keywords)) {
@@ -69,16 +85,15 @@ const getNodeType = (
         }
     }
 
-    // 3. Fallback to balance-based classification
+    // 4. Fallback to balance-based classification
     const usd = balanceUSD || 0;
-    if (usd > 100000) return 'whale';
-    if (usd > 50000) return 'shark';
-    if (usd > 10000) return 'dolphin';
-    if (usd > 1000) return 'fish';
-    
-    if (balance > 100) return 'fish';
-    
-    return 'shrimp';
+    if (usd > 100000) return "whale";
+    if (usd > 50000) return "shark";
+    if (usd > 10000) return "dolphin";
+    if (usd > 1000) return "fish";
+    if (balance > 100) return "fish";
+
+    return "shrimp";
 };
 
 const getMass = (balance: number, balanceUSD: number | null, tokenBalance?: number) => {
@@ -102,7 +117,6 @@ const getMass = (balance: number, balanceUSD: number | null, tokenBalance?: numb
 const getNodeSize = (balance: number, balanceUSD: number | null, tokenBalance?: number) => {
     let value = 0;
     if (tokenBalance && tokenBalance > 0) {
-        // We don't have price, so just use amount for relative sizing
         value = tokenBalance;
     } else {
         value = (balanceUSD !== null && balanceUSD > 0) ? balanceUSD : (balance * 150);
@@ -148,7 +162,6 @@ export const processTransactions = (
         const to = 'to' in tx ? tx.to : tx.instructions[0]?.programId;
         const value = 'valueUSD' in tx ? tx.valueUSD : ('events' in tx && tx.events?.nft ? tx.events.nft.amount : null) ?? 0;
 
-
         const participants = new Set([from, to].filter(Boolean) as string[]);
         
         participants.forEach(address => {
@@ -165,7 +178,6 @@ export const processTransactions = (
             }
         });
 
-        // Calculate Net Flow
         if (from && value > 0) {
             addressData[from].netFlow -= value;
         }
@@ -189,7 +201,6 @@ export const processTransactions = (
                 allLinks[linkId].volume += Math.abs(value);
             }
 
-            // Aggregate token volumes
             if ('tokenMint' in tx && tx.tokenMint && tx.tokenSymbol && tx.tokenAmount) {
                 const tokenMint = tx.tokenMint;
                 const current = allLinks[linkId].tokenVolumes.get(tokenMint) || { amount: 0, symbol: tx.tokenSymbol };
@@ -197,15 +208,12 @@ export const processTransactions = (
                 allLinks[linkId].tokenVolumes.set(tokenMint, current);
             }
 
-
-            // This is now used for edge weight in hierarchical view
             allLinks[linkId].width = Math.log2(allLinks[linkId].volume + 1);
         }
     });
     
     const visibleNodes = new Set<string>();
 
-    // Initial population based on depth from root
     if (Object.keys(addressData).includes(rootAddress)) {
       const queue: [string, number][] = [[rootAddress, 0]];
       const visited = new Set<string>([rootAddress]);
@@ -227,23 +235,20 @@ export const processTransactions = (
       }
     }
 
-    // Add nodes connected to manually expanded nodes
     expandedNodeIds.forEach(expandedId => {
         if (!adjacencyList[expandedId]) return;
-        visibleNodes.add(expandedId); // Ensure the expanded node itself is visible
+        visibleNodes.add(expandedId);
         const neighbors = adjacencyList[expandedId];
         for (const neighbor of neighbors) {
             visibleNodes.add(neighbor);
         }
     });
     
-    
     if(visibleNodes.size === 0 && Object.keys(addressData).length > 0) {
-        // Fallback if root address not in data, show all.
         Object.keys(addressData).forEach(id => visibleNodes.add(id));
     }
 
-    const SMART_MONEY_THRESHOLD_USD = 50000; // e.g., Net inflow of $50k
+    const SMART_MONEY_THRESHOLD_USD = 50000;
     
     const nodes: GraphNode[] = Object.keys(addressData)
         .filter(address => visibleNodes.has(address))
@@ -290,7 +295,7 @@ export const processTransactions = (
                 fixed,
                 x: fixed ? 0 : undefined,
                 y: fixed ? 0 : undefined,
-                title: undefined, // Remove title to prevent default tooltip
+                title: undefined,
                 color: nodeColor,
                 borderWidth: isSmartMoney ? 4 : 2,
                 tokenBalance: tokenBalance,
@@ -305,15 +310,16 @@ export const processTransactions = (
     return { nodes, links };
 };
 
-
 export const groupStyles: Options['groups'] = {
     root:     { color: { background: '#2563EB', border: '#1D4ED8' }, font: { color: '#fff', face: 'Inter', weight: 'bold' } },
     exchange: { color: { background: '#c00000', border: '#a00000' }, font: { color: '#fff', face: 'Inter', weight: 'bold' } },
     platform: { color: { background: '#1e88e5', border: '#155fa0' }, font: { color: '#fff', face: 'Inter', weight: 'bold' } },
+    bridge:   { color: { background: '#546e7a', border: '#445761' }, font: { color: '#fff' } },
+    dao:      { color: { background: '#8e24aa', border: '#6a1b9a' }, font: { color: '#fff' } },
+    nft:      { color: { background: '#f06292', border: '#c2185b' }, font: { color: '#fff' } },
     whale:    { color: { background: '#7b1fa2', border: '#581672' }, font: { color: '#fff', face: 'Inter', weight: 'bold' } },
     shark:    { color: { background: '#f57c00', border: '#c46300' }, font: { color: '#fff' } },
     dolphin:  { color: { background: '#0097a7', border: '#007984' }, font: { color: '#fff' } },
     fish:     { color: { background: '#fbc02d', border: '#c99a24' }, font: { color: '#000' } },
     shrimp:   { color: { background: '#388e3c', border: '#2a6b2d' }, font: { color: '#fff' } },
-    bridge:   { color: { background: '#546e7a', border: '#445761' }, font: { color: '#fff' } },
 };
