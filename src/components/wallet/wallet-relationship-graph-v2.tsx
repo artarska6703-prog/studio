@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/use-debounce';
-import { FlattenedTransaction, WalletDetails } from '@/lib/types';
+import { FlattenedTransaction, WalletDetails, AddressNameAndTags } from '@/lib/types';
 import { GraphNode, GraphLink } from './wallet-relationship-graph-utils';
 import { processTransactions, groupStyles, PhysicsState } from './wallet-relationship-graph-utils';
 import { Checkbox } from '../ui/checkbox';
@@ -32,9 +32,13 @@ interface WalletNetworkGraphProps {
     walletDetails: WalletDetails | null;
     extraWalletBalances: Record<string, number>;
     specificTokenBalances: Record<string, number>;
+    addressTags?: Record<string, AddressNameAndTags>;
     onFetchTokenBalances: (addresses: string[], mint: string) => void;
+    onFetchBalances?: (addresses: string[]) => Promise<void>;
+    onFetchAddressNames?: (addresses: string[]) => Promise<void>;
+    allTransactions?: FlattenedTransaction[];
+    setAllTransactions?: React.Dispatch<React.SetStateAction<FlattenedTransaction[]>>;
 }
-
 
 const legendItems = [
   { key: 'root', label: 'You' },
@@ -85,30 +89,47 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
             {formatCurrency(node.netFlow)}
         </div>
       </div>
+      {node.type !== 'root' && (
+        <div className="mt-2 pt-2 border-t border-border text-[10px] text-muted-foreground text-center">
+          💡 Double-click to expand network
+        </div>
+      )}
     </div>
   );
 };
 
-// Function to format large numbers into a compact representation (e.g., 1.5M)
 function formatCompactNumber(num: number): string {
     if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
     if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
     return num.toFixed(1);
 }
 
-
-export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetails, extraWalletBalances, specificTokenBalances, onFetchTokenBalances }: WalletNetworkGraphProps) {
+export function WalletNetworkGraphV2({ 
+  walletAddress, 
+  transactions, 
+  walletDetails, 
+  extraWalletBalances, 
+  specificTokenBalances, 
+  addressTags = {},
+  onFetchTokenBalances,
+  onFetchBalances,
+  onFetchAddressNames,
+  allTransactions,
+  setAllTransactions
+}: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
   const edgesDataSetRef = useRef(new DataSet<GraphLink>());
   const animationFrameRef = useRef<number>();
+  const originalTransactionsRef = useRef<Set<string>>(new Set());
   
   const [minVolume, setMinVolume] = useState(0);
   const debouncedMinVolume = useDebounce(minVolume, 500);
   const [minTransactions, setMinTransactions] = useState(1);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState(legendItems.map(i => i.key));
   const [expandedNodeIds, setExpandedNodeIds] = useState(new Set<string>());
+  const [isExpanding, setIsExpanding] = useState(false);
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
@@ -116,30 +137,86 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
   const [isPlaying, setIsPlaying] = useState(false);
   const [tokenFilter, setTokenFilter] = useState<string>('all');
   
+  const expandNode = async (nodeAddress: string) => {
+    if (expandedNodeIds.has(nodeAddress) || nodeAddress === walletAddress) {
+      return;
+    }
+    
+    setIsExpanding(true);
+    try {
+      const res = await fetch(`/api/wallet/${nodeAddress}/transactions?limit=100`);
+      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+      
+      const data = await res.json();
+      console.log(`[EXPAND V2] Fetched ${data.transactions.length} transactions for ${shortenAddress(nodeAddress, 4)}`);
+      
+      if (setAllTransactions) {
+        setAllTransactions(prev => {
+          const existingSigs = new Set(prev.map(tx => tx.signature));
+          const newTxs = data.transactions.filter((tx: FlattenedTransaction) => 
+            !existingSigs.has(tx.signature)
+          );
+          console.log(`[EXPAND V2] Adding ${newTxs.length} new transactions`);
+          return [...prev, ...newTxs];
+        });
+      }
+      
+      setExpandedNodeIds(prev => new Set([...prev, nodeAddress]));
+      
+      const newAddresses = new Set<string>();
+      data.transactions.forEach((tx: FlattenedTransaction) => {
+        if (tx.from) newAddresses.add(tx.from);
+        if (tx.to) newAddresses.add(tx.to);
+      });
+      
+      const addressesToFetch = Array.from(newAddresses).filter(
+        addr => !(addr in extraWalletBalances) && addr !== walletAddress
+      );
+      
+      if (addressesToFetch.length > 0 && onFetchBalances) {
+        await onFetchBalances(addressesToFetch);
+      }
+      
+      if (onFetchAddressNames) {
+        const addressesToFetchTags = Array.from(newAddresses).filter(
+          addr => !(addr in addressTags)
+        );
+        if (addressesToFetchTags.length > 0) {
+          await onFetchAddressNames(addressesToFetchTags);
+        }
+      }
+    } catch (e) {
+      console.error('[EXPAND V2] Error:', e);
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
   const timeRange = useMemo(() => {
-    if (transactions.length === 0) return { min: 0, max: 0 };
-    const blockTimes = transactions.map(tx => tx.blockTime).filter(t => t);
+    const txs = allTransactions || transactions;
+    if (txs.length === 0) return { min: 0, max: 0 };
+    const blockTimes = txs.map(tx => tx.blockTime).filter(t => t);
     if (blockTimes.length === 0) return { min: 0, max: 0 };
     const min = Math.min(...blockTimes);
     const max = Math.max(...blockTimes);
     return { min, max };
-  }, [transactions]);
+  }, [allTransactions, transactions]);
 
   useEffect(() => {
-    // Set initial slider value to the max time
     setTimelineValue(timeRange.max);
   }, [timeRange.max]);
 
   const timeFilteredTransactions = useMemo(() => {
+    const txs = allTransactions || transactions;
     if (timeRange.max === 0 || timelineValue === timeRange.max) {
-      return transactions;
+      return txs;
     }
-    return transactions.filter(tx => tx.blockTime <= timelineValue);
-  }, [transactions, timelineValue, timeRange.max]);
+    return txs.filter(tx => tx.blockTime <= timelineValue);
+  }, [allTransactions, transactions, timelineValue, timeRange.max]);
 
   const availableTokens = useMemo(() => {
     const tokens = new Map<string, string>();
-    transactions.forEach(tx => {
+    timeFilteredTransactions.forEach(tx => {
       if (tx.tokenMint && tx.tokenSymbol) {
         if (!tokens.has(tx.tokenMint)) {
           tokens.set(tx.tokenMint, tx.tokenSymbol);
@@ -147,15 +224,35 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       }
     });
     return Array.from(tokens.entries()).map(([mint, symbol]) => ({ mint, symbol }));
-  }, [transactions]);
+  }, [timeFilteredTransactions]);
 
-  const allGraphData = useMemo(() => {
-    const filteredByToken = tokenFilter === 'all' 
-        ? timeFilteredTransactions
-        : timeFilteredTransactions.filter(tx => tx.tokenMint === tokenFilter || (tokenFilter === 'SOL' && tx.mint === 'So11111111111111111111111111111111111111112'));
+const allGraphData = useMemo(() => {
+  const filteredByToken = tokenFilter === 'all' 
+      ? timeFilteredTransactions
+      : timeFilteredTransactions.filter(tx => tx.tokenMint === tokenFilter || (tokenFilter === 'SOL' && tx.mint === 'So11111111111111111111111111111111111111112'));
 
-    return processTransactions(filteredByToken, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds, specificTokenBalances);
-  }, [timeFilteredTransactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds, tokenFilter, specificTokenBalances]);
+  if (originalTransactionsRef.current.size === 0) {
+    originalTransactionsRef.current = new Set(filteredByToken.map(tx => tx.signature));
+  }
+
+  const data = processTransactions(filteredByToken, walletAddress, 7, walletDetails, extraWalletBalances, expandedNodeIds, specificTokenBalances, addressTags);
+  
+ const nodesWithExpandedIndicator = data.nodes.map(node => ({
+  ...node,
+  borderWidth: expandedNodeIds.has(node.id) ? 5 : 2,
+  color: expandedNodeIds.has(node.id) 
+    ? (typeof node.color === 'string' 
+        ? { background: node.color, border: '#10b981', highlight: { border: '#10b981', background: node.color } }
+        : { ...node.color, border: '#10b981', highlight: { border: '#10b981', background: node.color?.background || '#888' } }
+      )
+    : node.color,
+  shadow: expandedNodeIds.has(node.id)
+    ? { enabled: true, color: '#10b981', size: 25, x: 0, y: 0 }
+    : { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
+}));
+  
+  return { nodes: nodesWithExpandedIndicator, links: data.links };
+}, [timeFilteredTransactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds, tokenFilter, specificTokenBalances, addressTags]);
 
     useEffect(() => {
         if (tokenFilter !== 'all' && tokenFilter !== 'SOL') {
@@ -209,7 +306,6 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     return { nodes: finalNodes, links: labeledLinks };
   }, [allGraphData, debouncedMinVolume, minTransactions, visibleNodeTypes, walletAddress, tokenFilter]);
 
-
   const handleNodeTypeToggle = (key: string, checked: boolean) => {
     setVisibleNodeTypes(prev => {
       const newSet = new Set(prev);
@@ -222,7 +318,6 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     })
   }
 
-  // Animation effect
   useEffect(() => {
     if (!isPlaying) {
       if (animationFrameRef.current) {
@@ -242,7 +337,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
           return timeRange.max;
         }
         const totalDuration = timeRange.max - timeRange.min;
-        const increment = (totalDuration / 30000) * deltaTime; // Animate over ~30 seconds
+        const increment = (totalDuration / 30000) * deltaTime;
         return Math.min(currentValue + increment, timeRange.max);
       });
 
@@ -275,7 +370,6 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
     setTimelineValue(timeRange.max);
   }
 
-  // Effect for updating data in the datasets
   useEffect(() => {
       if (!networkRef.current) return;
 
@@ -306,8 +400,6 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       
   }, [nodes, links]);
 
-
-  // Effect for initializing the network instance once
   useEffect(() => {
     if (!containerRef.current || networkRef.current) return;
     
@@ -323,7 +415,8 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
                 nodeSpacing: 150,
                 treeSpacing: 200,
                 levelSeparation: 200,
-            }
+            },
+            improvedLayout: false
         },
         physics: {
             enabled: false,
@@ -362,35 +455,37 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       edges: edgesDataSetRef.current
     }, options);
 
+    let clickTimeout: NodeJS.Timeout | null = null;
+
     networkInstance.on('click', ({ nodes: clickedNodes }) => {
         if (clickedNodes.length > 0) {
-            const clickedId = clickedNodes[0];
-            setExpandedNodeIds(prev => {
-                const newSet = new Set(prev);
-                if (newSet.has(clickedId)) {
-                } else {
-                    newSet.add(clickedId);
-                }
-                return newSet;
-            });
+            clickTimeout = setTimeout(() => {
+                setSelectedNodeAddress(clickedNodes[0]);
+                setIsSheetOpen(true);
+            }, 250);
         }
     });
     
     networkInstance.on('doubleClick', ({ nodes: dblClickedNodes }) => {
-        if (dblClickedNodes.length > 0) {
-            setSelectedNodeAddress(dblClickedNodes[0]);
-            setIsSheetOpen(true);
+        if (clickTimeout) {
+            clearTimeout(clickTimeout);
+            clickTimeout = null;
+        }
+        
+        if (dblClickedNodes.length > 0 && dblClickedNodes[0] !== walletAddress) {
+            console.log(`[EXPAND V2] Double-clicked node: ${shortenAddress(dblClickedNodes[0], 4)}`);
+            expandNode(dblClickedNodes[0]);
         }
     });
 
-   networkInstance.on('hoverNode', ({ node, event }) => {
-  const result = nodesDataSetRef.current.get(node);
-  const foundNode = Array.isArray(result) ? result[0] : result;
-  if (foundNode && containerRef.current) {
-    const rect = containerRef.current.getBoundingClientRect();
-    setTooltipData({ node: foundNode as GraphNode, position: { x: event.clientX - rect.left + 15, y: event.clientY - rect.top + 15 } });
-  }
-});
+    networkInstance.on('hoverNode', ({ node, event }) => {
+      const result = nodesDataSetRef.current.get(node);
+      const foundNode = Array.isArray(result) ? result[0] : result;
+      if (foundNode && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setTooltipData({ node: foundNode as GraphNode, position: { x: event.clientX - rect.left + 15, y: event.clientY - rect.top + 15 } });
+      }
+    });
 
     networkInstance.on('blurNode', () => setTooltipData({ node: null, position: null }));
     networkInstance.on('dragStart', () => setTooltipData({ node: null, position: null }));
@@ -401,7 +496,6 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
       networkInstance.destroy();
       networkRef.current = null;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress]);
 
   return (
@@ -448,7 +542,7 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
                 onValueChange={handleTimelineChange} 
                 min={timeRange.min} 
                 max={timeRange.max} 
-                step={3600} // 1 hour steps
+                step={3600}
                 disabled={timeRange.max === 0}
               />
               <div className="flex items-center gap-2 mt-2">
@@ -476,6 +570,31 @@ export function WalletNetworkGraphV2({ walletAddress, transactions, walletDetail
                 </div>
               ))}
             </div>
+            
+            <Separator />
+            {expandedNodeIds.size > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2">Expanded Nodes</h4>
+                <p className="text-sm text-muted-foreground mb-2">
+                  {expandedNodeIds.size} node{expandedNodeIds.size !== 1 ? 's' : ''} expanded
+                </p>
+                <Button
+                  onClick={() => {
+                    setExpandedNodeIds(new Set());
+                    if (setAllTransactions) {
+                      setAllTransactions(prev => 
+                        prev.filter(tx => originalTransactionsRef.current.has(tx.signature))
+                      );
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  Collapse All
+                </Button>
+              </div>
+            )}
           </div>
         </div>
         <div className="md:col-span-9 h-[800px] relative">

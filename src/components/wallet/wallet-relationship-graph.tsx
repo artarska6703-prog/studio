@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Button } from '../ui/button';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DataSet, Network, Edge, Options } from 'vis-network/standalone/esm/vis-network';
 import type { Node } from 'vis-network/standalone/esm/vis-network';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,13 +24,17 @@ export type DiagnosticData = {
 }
 
 interface WalletNetworkGraphProps {
-    walletAddress: string;
-    transactions: FlattenedTransaction[];
-    walletDetails: WalletDetails | null;
-    extraWalletBalances: Record<string, number>;
-    addressTags: Record<string, AddressNameAndTags>;
-    onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
-    isLoading: boolean;
+  walletAddress: string;
+  transactions: FlattenedTransaction[];
+  walletDetails: WalletDetails | null;
+  extraWalletBalances: Record<string, number>;
+  addressTags: Record<string, AddressNameAndTags>;
+  onDiagnosticDataUpdate?: (data: DiagnosticData) => void;
+  isLoading: boolean;
+  onFetchBalances?: (addresses: string[]) => Promise<void>;
+  onFetchAddressNames?: (addresses: string[]) => Promise<void>;
+  allTransactions?: FlattenedTransaction[];
+  setAllTransactions?: React.Dispatch<React.SetStateAction<FlattenedTransaction[]>>;
 }
 
 const legendItems = [
@@ -62,10 +67,23 @@ const GraphLegend = () => (
   </div>
 );
 
-const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {x: number, y: number} | null }) => {
+const CustomTooltip = ({ 
+  node, 
+  position
+}: { 
+  node: GraphNode | null; 
+  position: {x: number, y: number} | null;
+}) => {
   if (!node || !position) return null;
+  
   return (
-    <div className={cn("absolute p-3 rounded-lg shadow-lg text-xs w-64 z-10 pointer-events-none", "bg-popover text-popover-foreground border")} style={{ left: `${position.x}px`, top: `${position.y}px` }}>
+    <div 
+      className={cn(
+        "absolute p-3 rounded-lg shadow-lg text-xs w-64 z-10 pointer-events-none", 
+        "bg-popover text-popover-foreground border"
+      )} 
+      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+    >
       <div className="font-bold border-b border-border pb-1 mb-2 capitalize">
         {node.type}: {shortenAddress(node.id, 6)}
       </div>
@@ -73,15 +91,34 @@ const CustomTooltip = ({ node, position }: { node: GraphNode | null, position: {
         <div className="text-muted-foreground">Balance:</div>
         <div className="text-right font-mono">{node.balance.toFixed(2)} SOL</div>
         <div className="text-muted-foreground">Value (USD):</div>
-        <div className="text-right font-mono">{node.balanceUSD !== null ? formatCurrency(node.balanceUSD) : 'N/A'}</div>
+        <div className="text-right font-mono">
+          {node.balanceUSD !== null ? formatCurrency(node.balanceUSD) : 'N/A'}
+        </div>
         <div className="text-muted-foreground">Transactions:</div>
         <div className="text-right font-mono">{node.transactionCount}</div>
       </div>
+      {node.type !== 'root' && (
+        <div className="mt-2 pt-2 border-t border-border text-[10px] text-muted-foreground text-center">
+          💡 Double-click to expand network
+        </div>
+      )}
     </div>
   );
 };
 
-export function WalletNetworkGraph({ walletAddress, transactions, walletDetails, extraWalletBalances, addressTags, onDiagnosticDataUpdate, isLoading }: WalletNetworkGraphProps) {
+export function WalletNetworkGraph({ 
+  walletAddress, 
+  transactions, 
+  walletDetails, 
+  extraWalletBalances, 
+  addressTags, 
+  onDiagnosticDataUpdate, 
+  isLoading,
+  onFetchBalances,
+  onFetchAddressNames,
+  allTransactions,
+  setAllTransactions
+}: WalletNetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef(new DataSet<GraphNode>());
@@ -94,10 +131,101 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
   const [selectedNodeAddress, setSelectedNodeAddress] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ node: GraphNode | null; position: {x: number, y: number} | null; }>({ node: null, position: null });
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
+  const [isExpanding, setIsExpanding] = useState(false);
+  const originalTransactionsRef = useRef<Set<string>>(new Set());
 
-  const allGraphData = useMemo(() => {
-    return processTransactions(transactions, walletAddress, 5, walletDetails, extraWalletBalances, new Set(), {}, addressTags);
-  }, [transactions, walletAddress, walletDetails, extraWalletBalances, addressTags]);
+  const expandNode = async (nodeAddress: string) => {
+    if (expandedNodeIds.has(nodeAddress) || nodeAddress === walletAddress) {
+      return;
+    }
+    
+    setIsExpanding(true);
+    try {
+      const res = await fetch(`/api/wallet/${nodeAddress}/transactions?limit=100`);
+      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+      
+      const data = await res.json();
+      console.log(`[EXPAND] Fetched ${data.transactions.length} transactions for ${shortenAddress(nodeAddress, 4)}`);
+      
+      // Merge transactions
+      if (setAllTransactions) {
+        setAllTransactions(prev => {
+          const existingSigs = new Set(prev.map(tx => tx.signature));
+          const newTxs = data.transactions.filter((tx: FlattenedTransaction) => 
+            !existingSigs.has(tx.signature)
+          );
+          console.log(`[EXPAND] Adding ${newTxs.length} new transactions`);
+          return [...prev, ...newTxs];
+        });
+      }
+      
+      setExpandedNodeIds(prev => new Set([...prev, nodeAddress]));
+      
+      // Fetch balances
+      const newAddresses = new Set<string>();
+      data.transactions.forEach((tx: FlattenedTransaction) => {
+        if (tx.from) newAddresses.add(tx.from);
+        if (tx.to) newAddresses.add(tx.to);
+      });
+      
+      const addressesToFetch = Array.from(newAddresses).filter(
+        addr => !(addr in extraWalletBalances) && addr !== walletAddress
+      );
+      
+      if (addressesToFetch.length > 0 && onFetchBalances) {
+        await onFetchBalances(addressesToFetch);
+      }
+      
+      if (onFetchAddressNames) {
+        const addressesToFetchTags = Array.from(newAddresses).filter(
+          addr => !(addr in addressTags)
+        );
+        if (addressesToFetchTags.length > 0) {
+          await onFetchAddressNames(addressesToFetchTags);
+        }
+      }
+    } catch (e) {
+      console.error('[EXPAND] Error:', e);
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
+const allGraphData = useMemo(() => {
+  const txs = allTransactions || transactions;
+  
+  if (originalTransactionsRef.current.size === 0) {
+    originalTransactionsRef.current = new Set(txs.map(tx => tx.signature));
+  }
+  
+  const data = processTransactions(
+    txs, 
+    walletAddress, 
+    5, 
+    walletDetails, 
+    extraWalletBalances, 
+    expandedNodeIds, 
+    {}, 
+    addressTags
+  );
+  
+ const nodesWithExpandedIndicator = data.nodes.map(node => ({
+  ...node,
+  borderWidth: expandedNodeIds.has(node.id) ? 5 : 2,
+  color: expandedNodeIds.has(node.id) 
+    ? (typeof node.color === 'string' 
+        ? { background: node.color, border: '#10b981', highlight: { border: '#10b981', background: node.color } }
+        : { ...node.color, border: '#10b981', highlight: { border: '#10b981', background: node.color?.background || '#888' } }
+      )
+    : node.color,
+  shadow: expandedNodeIds.has(node.id)
+    ? { enabled: true, color: '#10b981', size: 25, x: 0, y: 0 }
+    : { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 5, y: 5 }
+}));
+  
+  return { nodes: nodesWithExpandedIndicator, links: data.links };
+}, [allTransactions, transactions, walletAddress, walletDetails, extraWalletBalances, expandedNodeIds, addressTags]);
 
   const { nodes, links } = useMemo(() => {
     const nodesWithFilters = allGraphData.nodes.filter(node => {
@@ -246,12 +374,30 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
       networkInstance.setOptions({ physics: false });
     });
     
-    networkInstance.on('click', ({ nodes: clickedNodes }) => {
-        if (clickedNodes.length > 0) {
+let clickTimeout: NodeJS.Timeout | null = null;
+
+networkInstance.on('click', ({ nodes: clickedNodes }) => {
+    if (clickedNodes.length > 0) {
+        // Delay single-click to allow double-click to be detected
+        clickTimeout = setTimeout(() => {
             setSelectedNodeAddress(clickedNodes[0]);
             setIsSheetOpen(true);
-        }
-    });
+        }, 250);
+    }
+});
+
+networkInstance.on('doubleClick', ({ nodes: clickedNodes }) => {
+    // Cancel the single-click if double-click happens
+    if (clickTimeout) {
+        clearTimeout(clickTimeout);
+        clickTimeout = null;
+    }
+    
+    if (clickedNodes.length > 0 && clickedNodes[0] !== walletAddress) {
+        console.log(`[EXPAND] Double-clicked node: ${shortenAddress(clickedNodes[0], 4)}`);
+        expandNode(clickedNodes[0]);
+    }
+});
 
     networkInstance.on('hoverNode', ({ node, event }) => {
       const result = nodesDataSetRef.current.get(node);
@@ -273,7 +419,7 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
           networkRef.current = null;
       }
     }
-  }, [isLoading, nodes, links]);
+  }, [isLoading, nodes, links, walletAddress]);
 
   return (
     <Card className="bg-transparent border-0 shadow-none">
@@ -299,6 +445,32 @@ export function WalletNetworkGraph({ walletAddress, transactions, walletDetails,
                 </div>
               ))}
             </div>
+            
+            <Separator />
+            {expandedNodeIds.size > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2">Expanded Nodes</h4>
+                <p className="text-sm text-muted-foreground mb-2">
+                  {expandedNodeIds.size} node{expandedNodeIds.size !== 1 ? 's' : ''} expanded
+                </p>
+                <Button
+  onClick={() => {
+    setExpandedNodeIds(new Set());
+    if (setAllTransactions) {
+      setAllTransactions(prev => 
+        prev.filter(tx => originalTransactionsRef.current.has(tx.signature))
+      );
+    }
+  }}
+  variant="outline"
+  size="sm"
+  className="w-full"
+>
+  Collapse All
+</Button>
+              </div>
+            )}
+            
           </div>
         </div>
         <div className="md:col-span-9 h-[800px] relative">

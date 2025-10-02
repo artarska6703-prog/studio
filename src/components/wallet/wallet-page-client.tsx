@@ -371,26 +371,35 @@ if (data?.namesAndTags && typeof data.namesAndTags === 'object') {
                       </Button>
                   </div>
                 </div>
-                <WalletNetworkGraph 
-                    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${walletDetails?.sol.price}`}
-                    walletAddress={address}
-                    transactions={liveTransactions}
-                    walletDetails={walletDetails}
-                    extraWalletBalances={extraWalletBalances}
-                    addressTags={addressTags}
-                    isLoading={isLoading}
-                />
+             <WalletNetworkGraph 
+    key={useMockData ? `mock-${mockScenario}` : `real-${address}-${walletDetails?.sol.price}`}
+    walletAddress={address}
+    transactions={liveTransactions}
+    walletDetails={walletDetails}
+    extraWalletBalances={extraWalletBalances}
+    addressTags={addressTags}
+    isLoading={isLoading}
+    onFetchBalances={fetchBalances}
+    onFetchAddressNames={fetchAddressNames}
+    allTransactions={allTransactions}
+    setAllTransactions={setAllTransactions}
+/>
             </TabsContent>
             <TabsContent value="graph-v2" className="mt-6">
                 <WalletNetworkGraphV2 
-                    key={`real-v2-${address}-${walletDetails?.sol.price}`}
-                    walletAddress={address}
-                    transactions={liveTransactions}
-                    walletDetails={walletDetails}
-                    extraWalletBalances={extraWalletBalances}
-                    specificTokenBalances={specificTokenBalances}
-                    onFetchTokenBalances={fetchBalances}
-                />
+    key={`real-v2-${address}-${walletDetails?.sol.price}`}
+    walletAddress={address}
+    transactions={liveTransactions}
+    walletDetails={walletDetails}
+    extraWalletBalances={extraWalletBalances}
+    specificTokenBalances={specificTokenBalances}
+    addressTags={addressTags}
+    onFetchTokenBalances={fetchBalances}
+    onFetchBalances={fetchBalances}
+    onFetchAddressNames={fetchAddressNames}
+    allTransactions={allTransactions}
+    setAllTransactions={setAllTransactions}
+/>
             </TabsContent>
         </Tabs>
         
